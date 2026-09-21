@@ -1,0 +1,11 @@
+# Cấu hình Metadata đồ án tốt nghiệp
+# Dùng để sinh Trang bìa và Trang phụ bìa chuẩn Phụ lục 1
+truong: "TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI"
+khoa: "KHOA CÔNG NGHỆ THÔNG TIN"
+de_tai: "XÂY DỰNG HỆ THỐNG QUẢN LÝ DOANH NGHIỆP TRỰC TUYẾN"
+gvhd: "TS. Nguyễn Văn A"
+svth: "Trần Văn B"
+mssv: "20123456"
+lop: "Công nghệ thông tin 2 - K64"
+nam: "2026"
+logo_path: "assets/logo.jpg"
