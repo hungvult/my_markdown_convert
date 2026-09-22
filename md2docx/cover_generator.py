@@ -60,13 +60,19 @@ class CoverGenerator:
         r_khoa.font.bold = True
 
         # 2. Logo trường
-        if logo_path and os.path.exists(logo_path):
+        resolved_logo = logo_path
+        if resolved_logo and not os.path.exists(resolved_logo):
+            fallback = os.path.join(os.path.dirname(__file__), "assets", "logo.jpg")
+            if os.path.exists(fallback):
+                resolved_logo = fallback
+
+        if resolved_logo and os.path.exists(resolved_logo):
             p_logo = doc.add_paragraph()
             p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p_logo.paragraph_format.space_before = Pt(6)
             p_logo.paragraph_format.space_after = Pt(18)
             run_logo = p_logo.add_run()
-            run_logo.add_picture(logo_path, width=Inches(1.5))
+            run_logo.add_picture(resolved_logo, width=Inches(1.5))
         else:
             # Khoảng trống nếu không có ảnh logo
             p_space = doc.add_paragraph()

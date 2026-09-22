@@ -188,6 +188,16 @@ class DocxReportBuilder:
         full_img_path = img_path
         if not os.path.isabs(img_path):
             full_img_path = os.path.join(self.base_dir, img_path)
+            if not os.path.exists(full_img_path):
+                candidates = [
+                    os.path.join(self.base_dir, "assets", os.path.basename(img_path)),
+                    os.path.join(self.base_dir, "..", img_path),
+                    os.path.join(self.base_dir, "..", "assets", os.path.basename(img_path))
+                ]
+                for cand in candidates:
+                    if os.path.exists(cand):
+                        full_img_path = cand
+                        break
         
         if os.path.exists(full_img_path):
             p_img = self.doc.add_paragraph()
@@ -425,4 +435,7 @@ class DocxReportBuilder:
 
     def save(self, output_path: str):
         """Lưu tài liệu DOCX kết quả"""
+        out_dir = os.path.dirname(output_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         self.doc.save(output_path)

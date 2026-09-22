@@ -1,8 +1,8 @@
 """
 Giao diện dòng lệnh CLI cho md2docx
 Hỗ trợ:
-- Chuyển đổi 1 file Markdown: python cli.py build thesis.md -o output.docx
-- Chuyển đổi 1 thư mục chứa các chương: python cli.py build chapters/ -o output.docx
+- Chuyển đổi 1 file Markdown: python -m md2docx.cli build templates/single_file -o out/single_file/output.docx
+- Chuyển đổi 1 thư mục chứa các chương: python -m md2docx.cli build templates/multi_chapter -o out/multi_chapter/output.docx
 """
 import os
 import sys
@@ -20,22 +20,52 @@ def parse_args():
     subparsers = parser.add_subparsers(dest="command", help="Lệnh thực thi")
 
     build_cmd = subparsers.add_parser("build", help="Biên dịch tài liệu Markdown sang DOCX")
-    build_cmd.add_argument("input_path", help="Đường dẫn file .md hoặc thư mục chứa các file chương")
-    build_cmd.add_argument("-o", "--output", default="Bao_Cao_Tot_Nghiep.docx", help="Tên file DOCX đầu ra")
-    build_cmd.add_argument("-c", "--config", default="thesis.yaml", help="Đường dẫn file cấu hình metadata YAML")
-    build_cmd.add_argument("-b", "--bib", default="", help="Đường dẫn file BibTeX references.bib (mặc định tìm references.bib cùng thư mục)")
+    build_cmd.add_argument("input_path", help="Đường dẫn file .md hoặc thư mục chứa tài liệu/các chương")
+    build_cmd.add_argument("-o", "--output", default="out/Bao_Cao_Tot_Nghiep.docx", help="Tên file DOCX đầu ra")
+    build_cmd.add_argument("-c", "--config", default="", help="Đường dẫn file cấu hình metadata YAML (tự nhận diện nếu để trống)")
+    build_cmd.add_argument("-b", "--bib", default="", help="Đường dẫn file BibTeX references.bib (tự nhận diện nếu để trống)")
 
     return parser.parse_args()
 
+def find_project_root(input_path: str) -> Path:
+    """Xác định thư mục gốc của bộ tài liệu (nơi chứa thesis.yaml, references.bib, assets/)"""
+    path = Path(input_path).resolve()
+    p = path.parent if path.is_file() else path
+
+    # Nếu đang trỏ trực tiếp vào thư mục con 'chapters'
+    if p.name == "chapters" and (p.parent / "thesis.yaml").exists():
+        return p.parent
+    if (p / "thesis.yaml").exists() or (p / "references.bib").exists():
+        return p
+    if (p / "chapters").is_dir():
+        return p
+    return p
+
 def collect_markdown_files(input_path: str) -> list[str]:
     """Thu thập danh sách các file Markdown theo thứ tự tên"""
-    path = Path(input_path)
+    path = Path(input_path).resolve()
     if path.is_file():
         return [str(path)]
     elif path.is_dir():
-        # Lấy tất cả file .md, sắp xếp theo tên (00_..., 01_..., 02_...)
+        # Ưu tiên 1: Thư mục con 'chapters'
+        chapters_dir = path / "chapters"
+        if chapters_dir.is_dir():
+            files = sorted([str(f) for f in chapters_dir.glob("*.md") if not f.name.startswith(".")])
+            if files:
+                return files
+
+        # Ưu tiên 2: Các file .md ngay tại thư mục chỉ định
         files = sorted([str(f) for f in path.glob("*.md") if not f.name.startswith(".")])
-        return files
+        if files:
+            return files
+
+        # Ưu tiên 3: File content.md hoặc template.md
+        for candidate in ["content.md", "template.md"]:
+            cand_path = path / candidate
+            if cand_path.exists():
+                return [str(cand_path)]
+
+        return []
     else:
         raise FileNotFoundError(f"Không tìm thấy đường dẫn: {input_path}")
 
@@ -52,7 +82,7 @@ def load_metadata(config_path: str, frontmatter_meta: dict) -> dict:
         "nam": "2026",
         "logo_path": "assets/logo.jpg"
     }
-    
+
     if config_path and os.path.exists(config_path):
         try:
             with open(config_path, "r", encoding="utf-8") as f:
@@ -67,7 +97,7 @@ def load_metadata(config_path: str, frontmatter_meta: dict) -> dict:
 
     return meta
 
-def run_pipeline(input_path: str, output_docx: str, config_path: str, bib_path: str = ""):
+def run_pipeline(input_path: str, output_docx: str, config_path: str = "", bib_path: str = ""):
     """
     Quy trình biên dịch 2-pass:
     1. Parse Markdown và thu thập tokens.
@@ -76,13 +106,15 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str, bib_path: 
     """
     md_files = collect_markdown_files(input_path)
     if not md_files:
-        print(f"[LỖI] Không có file Markdown nào tại {input_path}")
+        print(f"[LỖI] Không có file Markdown nào tại: {input_path}")
         sys.exit(1)
 
+    project_root = find_project_root(input_path)
+    print(f"[*] Gốc dự án tài liệu: {project_root}")
     print(f"[*] Đang thu thập nội dung từ {len(md_files)} tệp Markdown...")
     raw_text_parts = []
     first_frontmatter = {}
-    
+
     parser = MarkdownDocParser()
 
     for idx, fpath in enumerate(md_files):
@@ -91,39 +123,60 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str, bib_path: 
             if idx == 0:
                 first_frontmatter, content = parser.extract_frontmatter(content)
             else:
-                # Bỏ frontmatter nếu có ở các file phụ
                 _, content = parser.extract_frontmatter(content)
             raw_text_parts.append(content)
 
     full_markdown_text = "\n\n".join(raw_text_parts)
-    
+
+    # Tự động dò file config nếu không truyền
+    if not config_path:
+        for cand in [
+            project_root / "thesis.yaml",
+            Path(input_path).parent / "thesis.yaml",
+            Path("thesis.yaml")
+        ]:
+            if cand.exists():
+                config_path = str(cand)
+                break
+
     # Metadata
     metadata = load_metadata(config_path, first_frontmatter)
-    
+
+    # Tự động nhận diện đường dẫn logo
+    logo_val = metadata.get("logo_path", "assets/logo.jpg")
+    if not os.path.isabs(logo_val):
+        for cand in [
+            project_root / logo_val,
+            project_root / "assets" / Path(logo_val).name,
+            Path(input_path).parent / logo_val,
+            Path(__file__).parent / "assets" / "logo.jpg"
+        ]:
+            if cand.exists():
+                metadata["logo_path"] = str(cand)
+                break
+
     # Tokens
     tokens = parser.parse_to_tokens(full_markdown_text)
-    
+
     # PASS 1: Indexing & Cataloging
     print("[*] Thực hiện Pass 1: Định chỉ mục, đánh số phân cấp cho Chương, Bảng, Hình, Công thức, Trích dẫn...")
     indexer = DocIndexer()
 
-    # Nạp cơ sở dữ liệu BibTeX
-    base_dir = str(Path(input_path).parent) if Path(input_path).is_file() else input_path
+    # Tự động dò cơ sở dữ liệu BibTeX nếu không truyền
     if not bib_path:
-        for candidate in [
-            os.path.join(base_dir, "references.bib"),
-            os.path.join(base_dir, "../references.bib"),
-            "references.bib",
-            "doc/references.bib"
+        for cand in [
+            project_root / "references.bib",
+            Path(input_path).parent / "references.bib",
+            Path("references.bib")
         ]:
-            if os.path.exists(candidate):
-                bib_path = candidate
+            if cand.exists():
+                bib_path = str(cand)
                 break
 
     if bib_path and os.path.exists(bib_path):
         print(f"[*] Đang nạp cơ sở dữ liệu trích dẫn BibTeX: {bib_path}")
         indexer.load_bibtex(bib_path)
-    
+
     # Phân tích sơ bộ để index
     i = 0
     token_count = len(tokens)
@@ -137,7 +190,7 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str, bib_path: 
 
     while i < token_count:
         t = tokens[i]
-        
+
         # Bắt caption bảng từ comment marker
         if t.type == "html_block" and "<!--TABLE_CAPTION:" in t.content:
             m = re.search(r'<!--TABLE_CAPTION:\s*(.*?)\s*\|\s*(tbl:[\w-]+)?-->', t.content)
@@ -199,8 +252,7 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str, bib_path: 
 
     # PASS 2: Dựng tài liệu và resolve tham chiếu chéo
     print("[*] Thực hiện Pass 2: Dựng tài liệu DOCX và resolve tham chiếu chéo / trích dẫn...")
-    base_dir = str(Path(input_path).parent) if Path(input_path).is_file() else input_path
-    builder = DocxReportBuilder(metadata=metadata, indexer=indexer, base_dir=base_dir)
+    builder = DocxReportBuilder(metadata=metadata, indexer=indexer, base_dir=str(project_root))
     builder.initialize_document()
 
     in_bib_section = False
