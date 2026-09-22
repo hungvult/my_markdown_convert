@@ -50,10 +50,21 @@ class SectionManager:
         # Cấu hình số trang bắt đầu từ 1
         sectPr = s2._sectPr
         for child in list(sectPr):
-            if child.tag.endswith('pgNumType'):
+            if child.tag.endswith('pgNumType') or child.tag.endswith('pgBorders'):
                 sectPr.remove(child)
         pgNumType = parse_xml(r'<w:pgNumType %s w:start="1"/>' % nsdecls('w'))
         sectPr.append(pgNumType)
+
+        # Xóa khung viền thừa kế từ Section 1
+        no_borders = parse_xml(r'''
+            <w:pgBorders %s>
+                <w:top w:val="none"/>
+                <w:left w:val="none"/>
+                <w:bottom w:val="none"/>
+                <w:right w:val="none"/>
+            </w:pgBorders>
+        ''' % nsdecls('w'))
+        sectPr.append(no_borders)
 
         # Thiết lập Header căn giữa chứa trường PAGE
         hdr = s2.header
@@ -82,7 +93,18 @@ class SectionManager:
         # Không reset số trang, tiếp tục chuỗi đánh số từ Section 2
         sectPr = s3._sectPr
         for child in list(sectPr):
-            if child.tag.endswith('pgNumType'):
+            if child.tag.endswith('pgNumType') or child.tag.endswith('pgBorders'):
                 sectPr.remove(child)
+
+        # Đảm bảo không có khung viền
+        no_borders = parse_xml(r'''
+            <w:pgBorders %s>
+                <w:top w:val="none"/>
+                <w:left w:val="none"/>
+                <w:bottom w:val="none"/>
+                <w:right w:val="none"/>
+            </w:pgBorders>
+        ''' % nsdecls('w'))
+        sectPr.append(no_borders)
 
         return s3
