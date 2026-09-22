@@ -268,7 +268,7 @@ class DocIndexer:
         # Heading 2
         elif level == 2:
             if is_unnumbered:
-                c_title = re.sub(r'^[A-Za-z0-9]+(?:\.\d+)*[\.:\s]*', '', clean_title).strip()
+                c_title = re.sub(r'^(?:(?:[A-Za-z]|\d+)(?:\.\d+)+)[\.:\s]+', '', clean_title).strip()
                 res = {
                     "level": 2,
                     "type": "section",
@@ -287,7 +287,7 @@ class DocIndexer:
                 self.h2_idx += 1
                 self.h3_idx = 0
                 curr_prefix = self.current_appendix_letter if self.in_appendix else str(max(1, self.chapter_idx))
-                c_title = re.sub(r'^[A-Za-z0-9]+\.\d+[\.:\s]*', '', clean_title).strip()
+                c_title = re.sub(r'^(?:(?:[A-Za-z]|\d+)\.\d+)[\.:\s]+', '', clean_title).strip()
                 display = f"{curr_prefix}.{self.h2_idx}. {c_title}"
                 res = {
                     "level": 2,
@@ -307,7 +307,7 @@ class DocIndexer:
         # Heading 3
         elif level == 3:
             if is_unnumbered:
-                c_title = re.sub(r'^[A-Za-z0-9]+(?:\.\d+)*[\.:\s]*', '', clean_title).strip()
+                c_title = re.sub(r'^(?:(?:[A-Za-z]|\d+)(?:\.\d+)+)[\.:\s]+', '', clean_title).strip()
                 res = {
                     "level": 3,
                     "type": "subsection",
@@ -326,7 +326,7 @@ class DocIndexer:
                 self.h3_idx += 1
                 curr_prefix = self.current_appendix_letter if self.in_appendix else str(max(1, self.chapter_idx))
                 curr_h2 = max(1, self.h2_idx)
-                c_title = re.sub(r'^[A-Za-z0-9]+\.\d+\.\d+[\.:\s]*', '', clean_title).strip()
+                c_title = re.sub(r'^(?:(?:[A-Za-z]|\d+)\.\d+\.\d+)[\.:\s]+', '', clean_title).strip()
                 display = f"{curr_prefix}.{curr_h2}.{self.h3_idx}. {c_title}"
                 res = {
                     "level": 3,
