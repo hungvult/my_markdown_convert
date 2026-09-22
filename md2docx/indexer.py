@@ -16,6 +16,11 @@ class DocIndexer:
         self.tbl_idx = 0
         self.eq_idx = 0
         
+        # Chế độ phụ lục (Appendix Mode)
+        self.in_appendix = False
+        self.appendix_idx = 0
+        self.current_appendix_letter = ""
+        
         # Symbol table: id -> display_label (ví dụ: 'fig:arch' -> 'Hình 1.1')
         self.symbols: Dict[str, str] = {}
         
@@ -41,7 +46,7 @@ class DocIndexer:
         # Tiêu đề đặc biệt thuộc Body nhưng không mang số chương (hoặc là chương cuối)
         self.special_body_titles = {
             "MỞ ĐẦU", "KẾT LUẬN VÀ KIẾN NGHỊ", "KẾT LUẬN",
-            "DANH MỤC TÀI LIỆU THAM KHẢO", "TÀI LIỆU THAM KHẢO", "PHỤ LỤC"
+            "DANH MỤC TÀI LIỆU THAM KHẢO", "TÀI LIỆU THAM KHẢO"
         }
 
     def is_front_matter(self, title: str) -> bool:
@@ -92,12 +97,56 @@ class DocIndexer:
         
         # Heading 1
         if level == 1:
+            app_pattern = r'^(?:PHỤ\s+LỤC|APPENDIX)(?:\s+([A-Za-z]|\d+))?(?:[\s\.:_-]+(.*))?$'
+            m_app = re.match(app_pattern, clean_title, re.IGNORECASE)
+
             if self.is_front_matter(clean_title):
+                self.in_appendix = False
                 res = {
                     "level": 1,
                     "type": "front_matter",
                     "display": t_upper,
                     "chapter_num": 0
+                }
+            elif is_appendix or m_app:
+                # Chế độ Phụ lục (Appendix Mode)
+                self.in_appendix = True
+                if m_app and m_app.group(1):
+                    spec = m_app.group(1)
+                    if spec.isalpha():
+                        letter = spec.upper()
+                        self.appendix_idx = ord(letter) - ord('A') + 1
+                    else:
+                        self.appendix_idx = int(spec)
+                        letter = chr(ord('A') + self.appendix_idx - 1)
+                else:
+                    self.appendix_idx += 1
+                    letter = chr(ord('A') + self.appendix_idx - 1)
+                
+                self.current_appendix_letter = letter
+                self.h2_idx = 0
+                self.h3_idx = 0
+                self.fig_idx = 0
+                self.tbl_idx = 0
+                self.eq_idx = 0
+
+                sub_title = ""
+                if m_app and m_app.group(2):
+                    sub_title = m_app.group(2).strip()
+                elif not m_app:
+                    sub_title = clean_title
+
+                if is_unnumbered:
+                    display = f"PHỤ LỤC: {sub_title.upper()}" if sub_title else "PHỤ LỤC"
+                else:
+                    display = f"PHỤ LỤC {letter}. {sub_title.upper()}" if sub_title else f"PHỤ LỤC {letter}"
+
+                res = {
+                    "level": 1,
+                    "type": "special_body",
+                    "display": display,
+                    "chapter_num": self.chapter_idx,
+                    "appendix_letter": letter
                 }
             elif is_unnumbered or self.is_special_body(clean_title):
                 # Tiêu đề chính không có tiền tố Chương (Mở đầu, Kết luận hoặc đánh dấu {-} / {.unnumbered})
@@ -111,6 +160,7 @@ class DocIndexer:
                 }
             else:
                 # Chương thông thường
+                self.in_appendix = False
                 self.chapter_idx += 1
                 self.h2_idx = 0
                 self.h3_idx = 0
@@ -129,10 +179,10 @@ class DocIndexer:
                     "chapter_num": self.chapter_idx
                 }
                 
-        # Heading 2 (Mục X.Y)
+        # Heading 2 (Mục X.Y hoặc A.Y)
         elif level == 2:
             if is_unnumbered:
-                c_title = re.sub(r'^\d+(?:\.\d+)*[\.:\s]*', '', clean_title).strip()
+                c_title = re.sub(r'^[A-Za-z0-9]+(?:\.\d+)*[\.:\s]*', '', clean_title).strip()
                 res = {
                     "level": 2,
                     "type": "section",
@@ -142,21 +192,21 @@ class DocIndexer:
             else:
                 self.h2_idx += 1
                 self.h3_idx = 0
-                curr_chap = max(1, self.chapter_idx)
-                # Lọc bỏ tiền tố số đã có nếu có
-                c_title = re.sub(r'^\d+\.\d+[\.:\s]*', '', clean_title).strip()
-                display = f"{curr_chap}.{self.h2_idx}. {c_title}"
+                curr_prefix = self.current_appendix_letter if self.in_appendix else str(max(1, self.chapter_idx))
+                # Lọc bỏ tiền tố số hoặc chữ cái đã có nếu có
+                c_title = re.sub(r'^[A-Za-z0-9]+\.\d+[\.:\s]*', '', clean_title).strip()
+                display = f"{curr_prefix}.{self.h2_idx}. {c_title}"
                 res = {
                     "level": 2,
                     "type": "section",
                     "display": display,
-                    "num": f"{curr_chap}.{self.h2_idx}"
+                    "num": f"{curr_prefix}.{self.h2_idx}"
                 }
             
-        # Heading 3 (Tiểu mục X.Y.Z)
+        # Heading 3 (Tiểu mục X.Y.Z hoặc A.Y.Z)
         elif level == 3:
             if is_unnumbered:
-                c_title = re.sub(r'^\d+(?:\.\d+)*[\.:\s]*', '', clean_title).strip()
+                c_title = re.sub(r'^[A-Za-z0-9]+(?:\.\d+)*[\.:\s]*', '', clean_title).strip()
                 res = {
                     "level": 3,
                     "type": "subsection",
@@ -165,15 +215,15 @@ class DocIndexer:
                 }
             else:
                 self.h3_idx += 1
-                curr_chap = max(1, self.chapter_idx)
+                curr_prefix = self.current_appendix_letter if self.in_appendix else str(max(1, self.chapter_idx))
                 curr_h2 = max(1, self.h2_idx)
-                c_title = re.sub(r'^\d+\.\d+\.\d+[\.:\s]*', '', clean_title).strip()
-                display = f"{curr_chap}.{curr_h2}.{self.h3_idx}. {c_title}"
+                c_title = re.sub(r'^[A-Za-z0-9]+\.\d+\.\d+[\.:\s]*', '', clean_title).strip()
+                display = f"{curr_prefix}.{curr_h2}.{self.h3_idx}. {c_title}"
                 res = {
                     "level": 3,
                     "type": "subsection",
                     "display": display,
-                    "num": f"{curr_chap}.{curr_h2}.{self.h3_idx}"
+                    "num": f"{curr_prefix}.{curr_h2}.{self.h3_idx}"
                 }
             
         else:
@@ -188,11 +238,11 @@ class DocIndexer:
 
     def register_figure(self, caption: str, fig_id: Optional[str] = None) -> tuple[str, str]:
         """
-        Đánh số hình ảnh theo chương: Hình <Chương>.<Thứ_tự>
+        Đánh số hình ảnh theo chương / phụ lục: Hình <Chương/Phụ_lục>.<Thứ_tự>
         """
         self.fig_idx += 1
-        curr_chap = max(1, self.chapter_idx)
-        label_num = f"{curr_chap}.{self.fig_idx}"
+        curr_prefix = self.current_appendix_letter if self.in_appendix else str(max(1, self.chapter_idx))
+        label_num = f"{curr_prefix}.{self.fig_idx}"
         label_text = f"Hình {label_num}"
         full_caption = f"{label_text}. {caption}" if caption else label_text
         
@@ -213,11 +263,11 @@ class DocIndexer:
 
     def register_table(self, caption: str, tbl_id: Optional[str] = None) -> tuple[str, str]:
         """
-        Đánh số bảng biểu theo chương: Bảng <Chương>.<Thứ_tự>
+        Đánh số bảng biểu theo chương / phụ lục: Bảng <Chương/Phụ_lục>.<Thứ_tự>
         """
         self.tbl_idx += 1
-        curr_chap = max(1, self.chapter_idx)
-        label_num = f"{curr_chap}.{self.tbl_idx}"
+        curr_prefix = self.current_appendix_letter if self.in_appendix else str(max(1, self.chapter_idx))
+        label_num = f"{curr_prefix}.{self.tbl_idx}"
         label_text = f"Bảng {label_num}"
         full_caption = f"{label_text}. {caption}" if caption else label_text
         
@@ -237,11 +287,11 @@ class DocIndexer:
 
     def register_equation(self, eq_id: Optional[str] = None) -> str:
         """
-        Đánh số phương trình: (<Chương>.<Thứ_tự>)
+        Đánh số phương trình: (<Chương/Phụ_lục>.<Thứ_tự>)
         """
         self.eq_idx += 1
-        curr_chap = max(1, self.chapter_idx)
-        label = f"({curr_chap}.{self.eq_idx})"
+        curr_prefix = self.current_appendix_letter if self.in_appendix else str(max(1, self.chapter_idx))
+        label = f"({curr_prefix}.{self.eq_idx})"
         if eq_id:
             clean_id = eq_id.strip()
             self.symbols[clean_id] = label

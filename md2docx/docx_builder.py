@@ -224,10 +224,10 @@ class DocxReportBuilder:
             r.font.color.rgb = RGBColor(255, 0, 0)
             r.font.bold = True
 
-        # Trích xuất số hiệu hình nếu có (ví dụ: Hình 2.1)
+        # Trích xuất số hiệu hình nếu có (ví dụ: Hình 2.1 hoặc Hình A.1)
         bm_id = None
         bm_name = None
-        m_num = re.search(r'Hình\s+(\d+\.\d+)', full_caption)
+        m_num = re.search(r'Hình\s+([A-Za-z0-9]+(?:\.\d+)+)', full_caption)
         if m_num:
             clean_num = m_num.group(1).replace('.', '_')
             bm_name = f"bm_fig_{clean_num}"
@@ -244,8 +244,8 @@ class DocxReportBuilder:
             bm_start = parse_xml(r'<w:bookmarkStart %s w:id="%s" w:name="%s"/>' % (nsdecls('w'), bm_id, bm_name))
             p_cap._p.append(bm_start)
 
-        # Tách 'Hình X.Y.' in đậm, phần còn lại in nghiêng
-        m = re.match(r'^(Hình\s+\d+\.\d+\.?)(.*)$', resolved_caption)
+        # Tách 'Hình X.Y.' hoặc 'Hình A.1.' in đậm, phần còn lại in nghiêng
+        m = re.match(r'^(Hình\s+[A-Za-z0-9]+(?:\.\d+)+\.?)(.*)$', resolved_caption)
         if m:
             r_bold = p_cap.add_run(m.group(1))
             r_bold.font.name = FONT_FAMILY
@@ -269,7 +269,7 @@ class DocxReportBuilder:
     def render_table(self, rows_data: list, full_caption: str):
         """
         Render bảng và Caption:
-        - Caption nằm PHÍA TRÊN bảng: 'Bảng X.Y. <Tên bảng>'
+        - Caption nằm PHÍA TRÊN bảng: 'Bảng X.Y. <Tên bảng>' hoặc 'Bảng A.1. <Tên bảng>'
         - Format bảng: Header có background màu nhạt, viền xám, text căn giữa/trái
         """
         if full_caption:
@@ -277,7 +277,7 @@ class DocxReportBuilder:
             
             bm_id = None
             bm_name = None
-            m_num = re.search(r'Bảng\s+(\d+\.\d+)', full_caption)
+            m_num = re.search(r'Bảng\s+([A-Za-z0-9]+(?:\.\d+)+)', full_caption)
             if m_num:
                 clean_num = m_num.group(1).replace('.', '_')
                 bm_name = f"bm_tbl_{clean_num}"
@@ -294,7 +294,7 @@ class DocxReportBuilder:
                 bm_start = parse_xml(r'<w:bookmarkStart %s w:id="%s" w:name="%s"/>' % (nsdecls('w'), bm_id, bm_name))
                 p_cap._p.append(bm_start)
             
-            m = re.match(r'^(Bảng\s+\d+\.\d+\.?)(.*)$', resolved_caption)
+            m = re.match(r'^(Bảng\s+[A-Za-z0-9]+(?:\.\d+)+\.?)(.*)$', resolved_caption)
             if m:
                 r_bold = p_cap.add_run(m.group(1))
                 r_bold.font.name = FONT_FAMILY

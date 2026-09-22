@@ -178,3 +178,30 @@ Công thức tính toán [@eq:entropy] cho phép định lượng mức độ ng
 <!-- Hướng dẫn: Không cần điền danh sách thủ công tại đây.
 Toàn bộ danh mục tài liệu tham khảo sẽ được tự động trích xuất và định dạng từ tệp references.bib
 dựa theo thứ tự các khóa trích dẫn [@citekey] xuất hiện trong bài viết. -->
+
+# PHỤ LỤC A: CẤU HÌNH VÀ DỮ LIỆU BỔ TRỢ
+
+## Danh mục tham số môi trường
+
+Chi tiết các tham số môi trường được thống kê trong [@tbl:env_params].
+
+: Bảng các biến môi trường triển khai {#tbl:env_params}
+| Biến môi trường | Giá trị mặc định | Giải thích |
+| :--- | :--- | :--- |
+| APP_ENV | production | Môi trường triển khai ứng dụng |
+| DB_PORT | 5432 | Cổng kết nối cơ sở dữ liệu |
+| CACHE_TTL | 3600 | Thời gian sống của bản ghi cache (giây) |
+
+## Sơ đồ triển khai chi tiết
+
+![Kiến trúc phụ trợ và luồng dữ liệu](assets/logo.jpg){#fig:app_module}
+
+Mô hình triển khai chi tiết được thể hiện trong [@fig:app_module].
+
+### Hàm mục tiêu tối ưu hóa
+
+Hàm mục tiêu được biểu diễn theo công thức:
+
+$$ J(w, b) = \frac{1}{m} \sum_{i=1}^m L(\hat{y}^{(i)}, y^{(i)}) $$ {#eq:loss}
+
+Công thức tối ưu hóa [@eq:loss] được sử dụng trong quá trình huấn luyện mô hình.
