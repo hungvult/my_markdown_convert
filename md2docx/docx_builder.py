@@ -44,6 +44,9 @@ class DocxReportBuilder:
 
     def initialize_document(self):
         """Khởi tạo tài liệu và tạo trang bìa, phụ bìa"""
+        # Kích hoạt tự động cập nhật trường khi mở trên Microsoft Word
+        self.doc.settings.element.append(parse_xml(r'<w:updateFields %s w:val="true"/>' % nsdecls('w')))
+
         # Section 1: Trang bìa
         s1 = SectionManager.setup_cover_section(self.doc)
         CoverGenerator.apply_cover_border(s1)
@@ -70,16 +73,16 @@ class DocxReportBuilder:
             self.current_section_idx = 3
 
     def add_toc_field(self, paragraph):
-        """Nhúng trường TOC (Table of Contents) tự động của Word"""
+        """Nhúng trường TOC (Table of Contents) chuẩn OpenXML của Word"""
         p = paragraph._p
-        fldChar1 = parse_xml(r'<w:fldChar %s w:fldCharType="begin"/>' % nsdecls('w'))
-        instrText = parse_xml(r'<w:instrText %s xml:space="preserve"> TOC \o "1-3" \h \z \u </w:instrText>' % nsdecls('w'))
-        fldChar2 = parse_xml(r'<w:fldChar %s w:fldCharType="separate"/>' % nsdecls('w'))
-        fldChar3 = parse_xml(r'<w:fldChar %s w:fldCharType="end"/>' % nsdecls('w'))
-        p.append(fldChar1)
-        p.append(instrText)
-        p.append(fldChar2)
-        p.append(fldChar3)
+        r_begin = parse_xml(r'<w:r %s><w:fldChar w:fldCharType="begin"/></w:r>' % nsdecls('w'))
+        r_instr = parse_xml(r'<w:r %s><w:instrText xml:space="preserve"> TOC \o "1-3" \h \z \u </w:instrText></w:r>' % nsdecls('w'))
+        r_sep = parse_xml(r'<w:r %s><w:fldChar w:fldCharType="separate"/></w:r>' % nsdecls('w'))
+        r_end = parse_xml(r'<w:r %s><w:fldChar w:fldCharType="end"/></w:r>' % nsdecls('w'))
+        p.append(r_begin)
+        p.append(r_instr)
+        p.append(r_sep)
+        p.append(r_end)
 
     def render_heading(self, level: int, info: dict):
         """Render tiêu đề chuẩn theo level và outlineLvl"""
