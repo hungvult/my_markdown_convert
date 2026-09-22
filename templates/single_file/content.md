@@ -89,9 +89,17 @@ Trong bối cảnh chuyển đổi số mạnh mẽ của cuộc cách mạng c�
 
 Quản trị doanh nghiệp truyền thống bằng sổ sách hoặc các phần mềm rời rạc thường gây ra tình trạng phân mảnh thông tin, khó khăn trong việc báo cáo số liệu thời gian thực và tiềm ẩn nhiều sai sót trong quản lý tồn kho và tài chính. Theo quy định đào tạo đại học [@bogddt2021], việc thực hiện đồ án tốt nghiệp đòi hỏi sinh viên giải quyết bài toán thực tế dựa trên các chuẩn mực kiến trúc chuyên nghiệp [@fowler2018].
 
-## Khảo sát các giải pháp hiện có
+## Khảo sát hiện trạng các giải pháp tương tự
 
-Hiện nay trên thị trường đã có một số hệ thống ERP như SAP, Odoo, tuy nhiên chi phí bản quyền và việc triển khai các hệ thống này đối với các doanh nghiệp vừa và nhỏ (SMEs) tại Việt Nam vẫn còn gặp nhiều rào cản. Việc trình bày báo cáo tuân thủ hướng dẫn của Khoa CNTT [@utc2026] kết hợp đối chiếu các nguyên lý thiết kế [@fowler2018], [@bogddt2021].
+Hiện nay trên thị trường đã có một số giải pháp thương mại và mã nguồn mở phục vụ quản lý doanh nghiệp. Tuy nhiên, các giải pháp này thường có chi phí triển khai cao hoặc chưa tối ưu hóa cho quy trình đặc thù của doanh nghiệp vừa và nhỏ tại Việt Nam.
+
+## Ghi chú kỹ thuật {-}
+
+Phần này là ví dụ về tiêu đề không đánh số thứ tự (Unnumbered Heading) sử dụng cú pháp `{-}` hoặc `{.unnumbered}`. Mục này vẫn xuất hiện đầy đủ trong Mục lục (TOC) nhưng không mang tiền tố số phân cấp.
+
+## Mục tiêu và phạm vi nghiên cứu
+
+Việc trình bày báo cáo tuân thủ hướng dẫn của Khoa CNTT [@utc2026] kết hợp đối chiếu các nguyên lý thiết kế [@fowler2018], [@bogddt2021].
 
 : So sánh ưu nhược điểm của các giải pháp quản lý {#tbl:so_sanh}
 | Giải pháp | Chi phí | Khả năng tùy biến | Độ phức tạp triển khai |
@@ -153,14 +161,14 @@ Công thức tính toán [@eq:entropy] cho phép định lượng mức độ ng
 
 # KẾT LUẬN VÀ KIẾN NGHỊ
 
-## Các kết quả đạt được
+## Các kết quả đạt được {-}
 
 Đồ án đã hoàn thành các mục tiêu đặt ra:
 1. Nghiên cứu tổng quan cơ sở lý thuyết và khảo sát nhu cầu quản lý thực tế.
 2. Thiết kế chi tiết kiến trúc, mô hình CSDL và giao diện người dùng.
 3. Hiện thực hóa hệ thống và triển khai kiểm thử đạt yêu cầu.
 
-## Hướng phát triển tiếp theo
+## Hướng phát triển tiếp theo {-}
 
 - Nghiên cứu tích hợp trí tuệ nhân tạo (AI) để dự báo nhu cầu thị trường và tối ưu hóa tồn kho tự động.
 - Phát triển ứng dụng trên nền tảng di động (iOS / Android).

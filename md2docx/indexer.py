@@ -52,28 +52,61 @@ class DocIndexer:
         t_upper = title.strip().upper()
         return any(sb in t_upper for sb in self.special_body_titles)
 
+    def _parse_heading_attributes(self, raw_title: str) -> tuple[str, bool, bool, Optional[str]]:
+        """
+        Bóc tách các thuộc tính như {-}, {.unnumbered}, {.appendix}, {#id} từ tiêu đề Markdown.
+        """
+        is_unnumbered = False
+        is_appendix = False
+        heading_id = None
+        
+        m = re.search(r'\s*\{([^}]+)\}\s*$', raw_title)
+        if m:
+            raw_attr = m.group(1).strip()
+            tokens = raw_attr.split()
+            recognized = False
+            for tok in tokens:
+                if tok == '-' or tok.lower() in ('.unnumbered', 'unnumbered'):
+                    is_unnumbered = True
+                    recognized = True
+                elif tok.lower() in ('.appendix', 'appendix'):
+                    is_appendix = True
+                    recognized = True
+                elif tok.startswith('#'):
+                    heading_id = tok[1:]
+                    recognized = True
+            
+            if recognized:
+                clean = raw_title[:m.start()].strip()
+                return clean, is_unnumbered, is_appendix, heading_id
+
+        return raw_title.strip(), is_unnumbered, is_appendix, heading_id
+
     def register_heading(self, level: int, raw_title: str) -> dict:
         """
         Đăng ký tiêu đề và chuẩn hóa tên theo quy chuẩn ĐATN
         """
         raw_title = raw_title.strip()
-        t_upper = raw_title.upper()
+        clean_title, is_unnumbered, is_appendix, heading_id = self._parse_heading_attributes(raw_title)
+        t_upper = clean_title.upper()
         
         # Heading 1
         if level == 1:
-            if self.is_front_matter(raw_title):
-                return {
+            if self.is_front_matter(clean_title):
+                res = {
                     "level": 1,
                     "type": "front_matter",
                     "display": t_upper,
                     "chapter_num": 0
                 }
-            elif self.is_special_body(raw_title):
-                # Tiêu đề chính không có tiền tố Chương (Mở đầu, Kết luận...)
-                return {
+            elif is_unnumbered or self.is_special_body(clean_title):
+                # Tiêu đề chính không có tiền tố Chương (Mở đầu, Kết luận hoặc đánh dấu {-} / {.unnumbered})
+                m = re.match(r'^(?:CHƯƠNG\s+\d+[\.:\s]*|\d+[\.:\s]*)(.*)$', clean_title, re.IGNORECASE)
+                final_title = m.group(1).strip() if m else clean_title
+                res = {
                     "level": 1,
                     "type": "special_body",
-                    "display": t_upper,
+                    "display": final_title.upper(),
                     "chapter_num": self.chapter_idx
                 }
             else:
@@ -86,10 +119,10 @@ class DocIndexer:
                 self.eq_idx = 0
                 
                 # Kiểm tra nếu người dùng đã ghi sẵn "CHƯƠNG X..."
-                m = re.match(r'^(?:CHƯƠNG\s+\d+[\.:\s]*)(.*)$', raw_title, re.IGNORECASE)
-                clean_title = m.group(1).strip() if m else raw_title
-                display = f"CHƯƠNG {self.chapter_idx}. {clean_title.upper()}"
-                return {
+                m = re.match(r'^(?:CHƯƠNG\s+\d+[\.:\s]*)(.*)$', clean_title, re.IGNORECASE)
+                c_title = m.group(1).strip() if m else clean_title
+                display = f"CHƯƠNG {self.chapter_idx}. {c_title.upper()}"
+                res = {
                     "level": 1,
                     "type": "chapter",
                     "display": display,
@@ -98,34 +131,60 @@ class DocIndexer:
                 
         # Heading 2 (Mục X.Y)
         elif level == 2:
-            self.h2_idx += 1
-            self.h3_idx = 0
-            curr_chap = max(1, self.chapter_idx)
-            # Lọc bỏ tiền tố số đã có nếu có
-            clean_title = re.sub(r'^\d+\.\d+[\.:\s]*', '', raw_title).strip()
-            display = f"{curr_chap}.{self.h2_idx}. {clean_title}"
-            return {
-                "level": 2,
-                "type": "section",
-                "display": display,
-                "num": f"{curr_chap}.{self.h2_idx}"
-            }
+            if is_unnumbered:
+                c_title = re.sub(r'^\d+(?:\.\d+)*[\.:\s]*', '', clean_title).strip()
+                res = {
+                    "level": 2,
+                    "type": "section",
+                    "display": c_title,
+                    "num": ""
+                }
+            else:
+                self.h2_idx += 1
+                self.h3_idx = 0
+                curr_chap = max(1, self.chapter_idx)
+                # Lọc bỏ tiền tố số đã có nếu có
+                c_title = re.sub(r'^\d+\.\d+[\.:\s]*', '', clean_title).strip()
+                display = f"{curr_chap}.{self.h2_idx}. {c_title}"
+                res = {
+                    "level": 2,
+                    "type": "section",
+                    "display": display,
+                    "num": f"{curr_chap}.{self.h2_idx}"
+                }
             
         # Heading 3 (Tiểu mục X.Y.Z)
         elif level == 3:
-            self.h3_idx += 1
-            curr_chap = max(1, self.chapter_idx)
-            curr_h2 = max(1, self.h2_idx)
-            clean_title = re.sub(r'^\d+\.\d+\.\d+[\.:\s]*', '', raw_title).strip()
-            display = f"{curr_chap}.{curr_h2}.{self.h3_idx}. {clean_title}"
-            return {
-                "level": 3,
-                "type": "subsection",
-                "display": display,
-                "num": f"{curr_chap}.{curr_h2}.{self.h3_idx}"
-            }
+            if is_unnumbered:
+                c_title = re.sub(r'^\d+(?:\.\d+)*[\.:\s]*', '', clean_title).strip()
+                res = {
+                    "level": 3,
+                    "type": "subsection",
+                    "display": c_title,
+                    "num": ""
+                }
+            else:
+                self.h3_idx += 1
+                curr_chap = max(1, self.chapter_idx)
+                curr_h2 = max(1, self.h2_idx)
+                c_title = re.sub(r'^\d+\.\d+\.\d+[\.:\s]*', '', clean_title).strip()
+                display = f"{curr_chap}.{curr_h2}.{self.h3_idx}. {c_title}"
+                res = {
+                    "level": 3,
+                    "type": "subsection",
+                    "display": display,
+                    "num": f"{curr_chap}.{curr_h2}.{self.h3_idx}"
+                }
             
-        return {"level": level, "type": "heading", "display": raw_title}
+        else:
+            res = {"level": level, "type": "heading", "display": clean_title}
+
+        if heading_id:
+            self.symbols[heading_id] = res.get("display", clean_title)
+            if not heading_id.startswith("sec:"):
+                self.symbols[f"sec:{heading_id}"] = res.get("display", clean_title)
+
+        return res
 
     def register_figure(self, caption: str, fig_id: Optional[str] = None) -> tuple[str, str]:
         """
