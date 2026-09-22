@@ -13,19 +13,10 @@ if [ ! -f "$PYTHON" ]; then
     "$DIR/.venv/bin/pip" install -r "$DIR/requirements.txt"
 fi
 
-# 2. Hàm hỗ trợ xuất PDF nếu có LibreOffice
+# 2. Hàm hỗ trợ xuất PDF kết hợp cập nhật tự động Mục lục
 convert_to_pdf() {
     local docx_path="$1"
-    local target_dir
-    target_dir="$(dirname "$docx_path")"
-    if command -v libreoffice &> /dev/null; then
-        echo "[*] Đang chuyển đổi sang PDF qua LibreOffice..."
-        libreoffice --headless --convert-to pdf --outdir "$target_dir" "$docx_path" > /dev/null 2>&1 || true
-        local pdf_path="${docx_path%.docx}.pdf"
-        if [ -f "$pdf_path" ]; then
-            echo "[THÀNH CÔNG] Đã tạo file PDF: $pdf_path"
-        fi
-    fi
+    PYTHONPATH="$DIR" python3 "$DIR/md2docx/pdf_converter.py" "$docx_path"
 }
 
 build_target() {
