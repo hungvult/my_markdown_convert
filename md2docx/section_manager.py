@@ -38,28 +38,17 @@ class SectionManager:
 
     @classmethod
     def add_front_matter_section(cls, doc: Document):
-        """Tạo Section 2: Mục lục và danh mục (không số trang hoặc đánh số La Mã)"""
+        """
+        Tạo Section 2: Lời cảm ơn, Mục lục và danh mục
+        - Bắt đầu đánh số trang từ 1 ở GIỮA, ĐỈNH TRANG (Header Center)
+        """
         s2 = doc.add_section(WD_SECTION.NEW_PAGE)
         cls.apply_page_margins(s2)
         s2.header.is_linked_to_previous = False
         s2.footer.is_linked_to_previous = False
-        return s2
-
-    @classmethod
-    def add_body_section(cls, doc: Document):
-        """
-        Tạo Section 3: Nội dung chính
-        - Đánh số trang ở GIỮA, PHÍA TRÊN ĐẦU MỖI TRANG (Header Center)
-        - Đánh số trang bắt đầu lại từ 1
-        """
-        s3 = doc.add_section(WD_SECTION.NEW_PAGE)
-        cls.apply_page_margins(s3)
-        s3.header.is_linked_to_previous = False
-        s3.footer.is_linked_to_previous = False
 
         # Cấu hình số trang bắt đầu từ 1
-        sectPr = s3._sectPr
-        # Xóa pgNumType cũ nếu có
+        sectPr = s2._sectPr
         for child in list(sectPr):
             if child.tag.endswith('pgNumType'):
                 sectPr.remove(child)
@@ -67,16 +56,33 @@ class SectionManager:
         sectPr.append(pgNumType)
 
         # Thiết lập Header căn giữa chứa trường PAGE
-        hdr = s3.header
+        hdr = s2.header
         p_hdr = hdr.paragraphs[0]
         p_hdr.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        # Thêm Run định dạng font Times New Roman
+
         run = p_hdr.add_run()
         run.font.name = FONT_FAMILY
-        
-        # Nhúng trường Word PAGE
+
         fldSimple = parse_xml(r'<w:fldSimple %s w:instr="PAGE"/>' % nsdecls('w'))
         p_hdr._p.append(fldSimple)
+
+        return s2
+
+    @classmethod
+    def add_body_section(cls, doc: Document):
+        """
+        Tạo Section 3: Nội dung chính
+        - Kế thừa và tiếp tục dãy số trang từ Section 2 đến hết tài liệu
+        """
+        s3 = doc.add_section(WD_SECTION.NEW_PAGE)
+        cls.apply_page_margins(s3)
+        s3.header.is_linked_to_previous = True
+        s3.footer.is_linked_to_previous = False
+
+        # Không reset số trang, tiếp tục chuỗi đánh số từ Section 2
+        sectPr = s3._sectPr
+        for child in list(sectPr):
+            if child.tag.endswith('pgNumType'):
+                sectPr.remove(child)
 
         return s3
