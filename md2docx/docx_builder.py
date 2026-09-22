@@ -14,6 +14,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.oxml import parse_xml, OxmlElement
 from docx.oxml.ns import nsdecls, qn
+import math2docx
 
 from .config import (
     FONT_FAMILY, COLOR_BLACK,
@@ -377,46 +378,52 @@ class DocxReportBuilder:
 
     def render_equation(self, formula_text: str, eq_label: str):
         """
-        Render phương trình căn giữa kèm nhãn số (Chương.STT) ở lề phải
-        Dùng bảng ẩn viền 1 hàng 2 cột
+        Render phương trình căn giữa kèm nhãn số (Chương.STT) ở lề phải.
+        Sử dụng Tab Stops (không dùng bảng):
+        - Center Tab tại 8.0cm (4535 dxa)
+        - Right Tab tại 16.0cm (9071 dxa)
         """
-        table = self.doc.add_table(rows=1, cols=2)
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        
-        # Cột 1: 14cm (công thức căn giữa)
-        # Cột 2: 2cm (nhãn số căn phải)
-        col_widths = [Cm(13.5), Cm(2.5)]
-        for i, cell in enumerate(table.rows[0].cells):
-            cell.width = col_widths[i]
-            # Xóa viền cell
-            tcPr = cell._tc.get_or_add_tcPr()
-            tcBorders = parse_xml(r'''
-                <w:tcBorders %s>
-                    <w:top w:val="none"/>
-                    <w:left w:val="none"/>
-                    <w:bottom w:val="none"/>
-                    <w:right w:val="none"/>
-                </w:tcBorders>
+        p = self.doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(6)
+        p.paragraph_format.space_after = Pt(6)
+
+        clean_label = eq_label.strip() if eq_label else ""
+
+        if clean_label:
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            pPr = p._p.get_or_add_pPr()
+            tabs = parse_xml(r'''
+                <w:tabs %s>
+                    <w:tab w:val="center" w:pos="4535"/>
+                    <w:tab w:val="right" w:pos="9071"/>
+                </w:tabs>
             ''' % nsdecls('w'))
-            tcPr.append(tcBorders)
+            pPr.append(tabs)
 
-        # Cột công thức
-        c1 = table.rows[0].cells[0]
-        p1 = c1.paragraphs[0]
-        p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r1 = p1.add_run(formula_text)
-        r1.font.name = "Cambria Math"
-        r1.font.size = Pt(12)
-        r1.font.italic = True
+            # Tab 1: Căn giữa tại 8.0cm
+            p.add_run('\t')
 
-        # Cột nhãn
-        c2 = table.rows[0].cells[1]
-        p2 = c2.paragraphs[0]
-        p2.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        r2 = p2.add_run(eq_label)
-        r2.font.name = FONT_FAMILY
-        r2.font.size = Pt(12)
-        r2.font.bold = True
+            # Render công thức OMML
+            try:
+                math2docx.add_math(p, formula_text)
+            except Exception:
+                r = p.add_run(formula_text)
+                r.font.name = "Cambria Math"
+                r.font.italic = True
+
+            # Tab 2: Đẩy nhãn số sang lề phải 16.0cm
+            r_lbl = p.add_run(f'\t{clean_label}')
+            r_lbl.font.name = FONT_FAMILY
+            r_lbl.font.size = Pt(12)
+            r_lbl.font.bold = True
+        else:
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            try:
+                math2docx.add_math(p, formula_text)
+            except Exception:
+                r = p.add_run(formula_text)
+                r.font.name = "Cambria Math"
+                r.font.italic = True
 
     def render_figures_catalog_list(self):
         """Tự động sinh danh mục hình ảnh dạng dòng mục lục (Dot leader + PAGEREF)"""
@@ -521,13 +528,23 @@ class DocxReportBuilder:
             p._p.append(fld)
 
     def _render_inline_formatting(self, paragraph, text: str, is_table_header: bool = False):
-        """Parse và tạo các run có format: **bold**, *italic*, `code`, link"""
-        # Tokenizer regex đơn giản hóa để phân tách văn bản inline
-        pattern = r'(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))'
+        """Parse và tạo các run có format: $math$, **bold**, *italic*, `code`, link"""
+        # Tokenizer regex phân tách văn bản inline hỗ trợ cả inline math $...$
+        pattern = r'((?<!\\)\$[^$]+(?<!\\)\$|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))'
         tokens = re.split(pattern, text)
 
         for tok in tokens:
             if not tok:
+                continue
+
+            if tok.startswith("$") and tok.endswith("$") and len(tok) > 2 and not tok.startswith("$$"):
+                math_expr = tok[1:-1].strip()
+                try:
+                    math2docx.add_math(paragraph, math_expr)
+                except Exception:
+                    r = paragraph.add_run(math_expr)
+                    r.font.name = "Cambria Math"
+                    r.font.italic = True
                 continue
 
             if tok.startswith("**") and tok.endswith("**"):
@@ -550,7 +567,7 @@ class DocxReportBuilder:
                 else:
                     r = paragraph.add_run(tok)
             else:
-                r = paragraph.add_run(tok)
+                r = paragraph.add_run(tok.replace(r"\$", "$"))
 
             r.font.name = FONT_FAMILY
             r.font.size = BODY_FONT_SIZE if not is_table_header else Pt(12)

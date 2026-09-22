@@ -9,8 +9,8 @@ PYTHON="$DIR/.venv/bin/python"
 if [ ! -f "$PYTHON" ]; then
     echo "[*] Đang khởi tạo môi trường ảo Python..."
     python3 -m venv "$DIR/.venv"
-    "$DIR/.venv/bin/pip" install --upgrade pip
-    "$DIR/.venv/bin/pip" install -r "$DIR/requirements.txt"
+    "$PYTHON" -m pip install --upgrade pip
+    "$PYTHON" -m pip install -r "$DIR/requirements.txt"
 fi
 
 # 2. Hàm hỗ trợ xuất PDF kết hợp cập nhật tự động Mục lục
