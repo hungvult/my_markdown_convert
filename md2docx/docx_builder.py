@@ -15,6 +15,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.oxml import parse_xml, OxmlElement
 from docx.oxml.ns import nsdecls, qn
 import math2docx
+from bs4 import BeautifulSoup
 
 from .config import (
     FONT_FAMILY, COLOR_BLACK,
@@ -371,6 +372,155 @@ class DocxReportBuilder:
                     
                     resolved_cell = self.indexer.resolve_cross_references(str(cell_value))
                     self._render_inline_formatting(p, resolved_cell, is_table_header=is_header)
+
+        # Khoảng cách sau bảng
+        p_after = self.doc.add_paragraph()
+        p_after.paragraph_format.space_after = Pt(6)
+
+    def render_html_table(self, table_html: str, full_caption: str):
+        """
+        Render bảng HTML hỗ trợ colspan và rowspan:
+        - Caption nằm PHÍA TRÊN bảng: 'Bảng X.Y: <Tên bảng>'
+        - Format bảng: Header có background màu xám nhạt (#F2F2F2), viền xám
+        - Tự động phát hiện kích thước lưới và merge các ô theo rowspan/colspan
+        """
+        if full_caption:
+            resolved_caption = self.indexer.resolve_cross_references(full_caption)
+            
+            bm_id = None
+            bm_name = None
+            m_num = re.search(r'Bảng\s+([A-Za-z0-9]+(?:\.\d+)+)', full_caption)
+            if m_num:
+                clean_num = m_num.group(1).replace('.', '_')
+                bm_name = f"bm_tbl_{clean_num}"
+                self.bookmark_id_counter = getattr(self, "bookmark_id_counter", 100) + 1
+                bm_id = self.bookmark_id_counter
+
+            p_cap = self.doc.add_paragraph()
+            p_cap.alignment = CAPTION_ALIGNMENT
+            p_cap.paragraph_format.space_before = Pt(8)
+            p_cap.paragraph_format.space_after = Pt(3)
+            p_cap.paragraph_format.keep_with_next = True
+
+            if bm_id and bm_name:
+                bm_start = parse_xml(r'<w:bookmarkStart %s w:id="%s" w:name="%s"/>' % (nsdecls('w'), bm_id, bm_name))
+                p_cap._p.append(bm_start)
+            
+            m = re.match(r'^(Bảng\s+[A-Za-z0-9]+(?:\.\d+)+\.?)(.*)$', resolved_caption)
+            if m:
+                r_bold = p_cap.add_run(m.group(1))
+                r_bold.font.name = FONT_FAMILY
+                r_bold.font.size = CAPTION_FONT_SIZE
+                r_bold.font.bold = True
+                
+                r_text = p_cap.add_run(m.group(2))
+                r_text.font.name = FONT_FAMILY
+                r_text.font.size = CAPTION_FONT_SIZE
+                r_text.font.italic = True
+            else:
+                r = p_cap.add_run(resolved_caption)
+                r.font.name = FONT_FAMILY
+                r.font.size = CAPTION_FONT_SIZE
+                r.font.bold = True
+
+            if bm_id and bm_name:
+                bm_end = parse_xml(r'<w:bookmarkEnd %s w:id="%s"/>' % (nsdecls('w'), bm_id))
+                p_cap._p.append(bm_end)
+
+        soup = BeautifulSoup(table_html, 'html.parser')
+        table_tag = soup.find('table')
+        if not table_tag:
+            return
+
+        tr_tags = table_tag.find_all('tr')
+        if not tr_tags:
+            return
+
+        occupied = set()
+        grid = {}
+        merges = []
+
+        for r, tr in enumerate(tr_tags):
+            c = 0
+            cell_tags = tr.find_all(['td', 'th'])
+            for tag in cell_tags:
+                while (r, c) in occupied:
+                    c += 1
+                try:
+                    rowspan = int(tag.get('rowspan', 1))
+                except (ValueError, TypeError):
+                    rowspan = 1
+                try:
+                    colspan = int(tag.get('colspan', 1))
+                except (ValueError, TypeError):
+                    colspan = 1
+
+                is_header = (tag.name == 'th') or any(p.name == 'thead' for p in tag.parents)
+                text = tag.get_text(strip=True)
+
+                for dr in range(rowspan):
+                    for dc in range(colspan):
+                        occupied.add((r + dr, c + dc))
+
+                if rowspan > 1 or colspan > 1:
+                    merges.append(((r, c), (r + rowspan - 1, c + colspan - 1)))
+
+                grid[(r, c)] = {
+                    'text': text,
+                    'is_header': is_header,
+                    'rowspan': rowspan,
+                    'colspan': colspan
+                }
+                c += colspan
+
+        if not occupied:
+            return
+
+        num_rows = max(pos[0] for pos in occupied) + 1
+        num_cols = max(pos[1] for pos in occupied) + 1
+
+        table = self.doc.add_table(rows=num_rows, cols=num_cols)
+        table.alignment = TABLE_ALIGNMENT
+        table.autofit = True
+
+        # Viền bảng
+        tblBorders = parse_xml(r'''
+        <w:tblBorders %s>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="%s"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="%s"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="%s"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="%s"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="%s"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="%s"/>
+        </w:tblBorders>
+        ''' % (nsdecls('w'), TABLE_BORDER_COLOR, TABLE_BORDER_COLOR, TABLE_BORDER_COLOR,
+               TABLE_BORDER_COLOR, TABLE_BORDER_COLOR, TABLE_BORDER_COLOR))
+        table._tbl.tblPr.append(tblBorders)
+
+        # Thực hiện merge các ô
+        for (r1, c1), (r2, c2) in merges:
+            cell_start = table.cell(r1, c1)
+            cell_end = table.cell(r2, c2)
+            cell_start.merge(cell_end)
+
+        # Ghi nội dung và định dạng cho từng ô
+        for (r, c), info in grid.items():
+            cell = table.cell(r, c)
+            p = cell.paragraphs[0]
+            p.text = ''
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER if info['is_header'] else WD_ALIGN_PARAGRAPH.LEFT
+            p.paragraph_format.space_before = Pt(3)
+            p.paragraph_format.space_after = Pt(3)
+            p.paragraph_format.line_spacing = 1.15
+
+            resolved_cell = self.indexer.resolve_cross_references(info['text'])
+            self._render_inline_formatting(p, resolved_cell, is_table_header=info['is_header'])
+
+            if info['is_header']:
+                shd = parse_xml(r'<w:shd %s w:fill="%s"/>' % (nsdecls('w'), TABLE_HEADER_BG))
+                cell._tc.get_or_add_tcPr().append(shd)
+
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
 
         # Khoảng cách sau bảng
         p_after = self.doc.add_paragraph()

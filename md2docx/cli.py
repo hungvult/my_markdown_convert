@@ -10,6 +10,7 @@ import argparse
 import re
 import yaml
 from pathlib import Path
+from bs4 import BeautifulSoup
 
 from .parser import MarkdownDocParser
 from .indexer import DocIndexer
@@ -211,6 +212,37 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str = "", bib_p
             i += 1
             continue
 
+        # Bắt bảng HTML từ html_block
+        if t.type == "html_block" and "<table" in t.content.lower():
+            soup = BeautifulSoup(t.content, "html.parser")
+            table_tag = soup.find("table")
+            if table_tag:
+                cap = current_table_caption or ""
+                tbl_id = current_table_id
+
+                # Nếu chưa có caption, kiểm tra thẻ <caption> bên trong <table>
+                if not cap:
+                    caption_tag = table_tag.find("caption")
+                    if caption_tag:
+                        raw_caption = caption_tag.get_text(strip=True)
+                        m_id = re.search(r'\{#(tbl:[\w-]+)\}', raw_caption)
+                        if m_id:
+                            tbl_id = m_id.group(1).strip()
+                            cap = re.sub(r'\{#tbl:[\w-]+\}', '', raw_caption).strip()
+                        else:
+                            cap = raw_caption
+
+                if cap.strip():
+                    label, full_cap = indexer.register_table(cap, tbl_id)
+                    table_registrations[i] = (cap, tbl_id, full_cap, "html", str(table_tag))
+                else:
+                    table_registrations[i] = ("", None, "", "html", str(table_tag))
+
+                current_table_caption = None
+                current_table_id = None
+                i += 1
+                continue
+
         # Bắt tiêu đề
         if t.type == "heading_open":
             level = int(t.tag[1]) # 'h1' -> 1
@@ -220,15 +252,15 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str = "", bib_p
             i += 2
             continue
 
-        # Bắt bảng
+        # Bắt bảng Markdown
         if t.type == "table_open":
             cap = current_table_caption or ""
             tbl_id = current_table_id
             if cap.strip():
                 label, full_cap = indexer.register_table(cap, tbl_id)
-                table_registrations[i] = (cap, tbl_id, full_cap)
+                table_registrations[i] = (cap, tbl_id, full_cap, "markdown", None)
             else:
-                table_registrations[i] = ("", None, "")
+                table_registrations[i] = ("", None, "", "markdown", None)
             current_table_caption = None
             current_table_id = None
             i += 1
@@ -290,6 +322,15 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str = "", bib_p
             i += 1
             continue
 
+        # 2b. HTML Table
+        if t.type == "html_block" and i in table_registrations:
+            reg = table_registrations[i]
+            if len(reg) >= 5 and reg[3] == "html":
+                _, _, full_cap, _, table_html = reg
+                builder.render_html_table(table_html, full_cap)
+                i += 1
+                continue
+
         # 3. Figure
         if t.type == "paragraph_open" and (i+1 < token_count) and (i+1 in figure_registrations):
             full_cap, img_path = figure_registrations[i+1]
@@ -297,9 +338,10 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str = "", bib_p
             i += 3 # p_open, inline, p_close
             continue
 
-        # 4. Table
+        # 4. Table Markdown
         if t.type == "table_open":
-            _, _, full_cap = table_registrations.get(i, ("", None, ""))
+            reg = table_registrations.get(i, ("", None, ""))
+            full_cap = reg[2] if len(reg) >= 3 else ""
             # Thu thập hàng của bảng
             rows = []
             current_row = []
