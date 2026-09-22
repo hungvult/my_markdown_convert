@@ -40,6 +40,7 @@ class DocxReportBuilder:
         self.current_section_idx = 1 # 1: Cover, 2: Front Matter, 3: Body
         self.body_started = False
         self.front_matter_started = False
+        self.first_front_matter_rendered = False
         self.first_chapter_rendered = False
 
     def initialize_document(self):
@@ -92,8 +93,9 @@ class DocxReportBuilder:
         # Quản lý chuyển đổi Section
         if h_type == "front_matter":
             self.ensure_front_matter_section()
-            if self.front_matter_started and self.doc.paragraphs and len(self.doc.paragraphs) > 2:
+            if self.first_front_matter_rendered:
                 self.doc.add_page_break()
+            self.first_front_matter_rendered = True
         elif h_type in ("chapter", "special_body"):
             self.ensure_body_section()
             if self.first_chapter_rendered:
