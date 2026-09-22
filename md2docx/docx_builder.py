@@ -119,9 +119,9 @@ class DocxReportBuilder:
 
             # Tự động sinh danh mục hình / bảng nếu gặp tiêu đề danh mục
             if "DANH MỤC HÌNH" in text.upper() or "DANH MỤC CÁC HÌNH" in text.upper():
-                self.render_figures_catalog_table()
+                self.render_figures_catalog_list()
             elif "DANH MỤC BẢNG" in text.upper() or "DANH MỤC CÁC BẢNG" in text.upper():
-                self.render_tables_catalog_table()
+                self.render_tables_catalog_list()
             elif "MỤC LỤC" in text.upper():
                 p_toc = self.doc.add_paragraph()
                 self.add_toc_field(p_toc)
@@ -222,12 +222,26 @@ class DocxReportBuilder:
             r.font.color.rgb = RGBColor(255, 0, 0)
             r.font.bold = True
 
+        # Trích xuất số hiệu hình nếu có (ví dụ: Hình 2.1)
+        bm_id = None
+        bm_name = None
+        m_num = re.search(r'Hình\s+(\d+\.\d+)', full_caption)
+        if m_num:
+            clean_num = m_num.group(1).replace('.', '_')
+            bm_name = f"bm_fig_{clean_num}"
+            self.bookmark_id_counter = getattr(self, "bookmark_id_counter", 100) + 1
+            bm_id = self.bookmark_id_counter
+
         # Caption nằm DƯỚI hình
         p_cap = self.doc.add_paragraph()
         p_cap.alignment = CAPTION_ALIGNMENT
         p_cap.paragraph_format.space_before = Pt(2)
         p_cap.paragraph_format.space_after = Pt(10)
         
+        if bm_id and bm_name:
+            bm_start = parse_xml(r'<w:bookmarkStart %s w:id="%s" w:name="%s"/>' % (nsdecls('w'), bm_id, bm_name))
+            p_cap._p.append(bm_start)
+
         # Tách 'Hình X.Y.' in đậm, phần còn lại in nghiêng
         m = re.match(r'^(Hình\s+\d+\.\d+\.?)(.*)$', resolved_caption)
         if m:
@@ -246,6 +260,10 @@ class DocxReportBuilder:
             r.font.size = CAPTION_FONT_SIZE
             r.font.bold = True
 
+        if bm_id and bm_name:
+            bm_end = parse_xml(r'<w:bookmarkEnd %s w:id="%s"/>' % (nsdecls('w'), bm_id))
+            p_cap._p.append(bm_end)
+
     def render_table(self, rows_data: list, full_caption: str):
         """
         Render bảng và Caption:
@@ -254,11 +272,25 @@ class DocxReportBuilder:
         """
         if full_caption:
             resolved_caption = self.indexer.resolve_cross_references(full_caption)
+            
+            bm_id = None
+            bm_name = None
+            m_num = re.search(r'Bảng\s+(\d+\.\d+)', full_caption)
+            if m_num:
+                clean_num = m_num.group(1).replace('.', '_')
+                bm_name = f"bm_tbl_{clean_num}"
+                self.bookmark_id_counter = getattr(self, "bookmark_id_counter", 100) + 1
+                bm_id = self.bookmark_id_counter
+
             p_cap = self.doc.add_paragraph()
             p_cap.alignment = CAPTION_ALIGNMENT
             p_cap.paragraph_format.space_before = Pt(8)
             p_cap.paragraph_format.space_after = Pt(3)
             p_cap.paragraph_format.keep_with_next = True
+
+            if bm_id and bm_name:
+                bm_start = parse_xml(r'<w:bookmarkStart %s w:id="%s" w:name="%s"/>' % (nsdecls('w'), bm_id, bm_name))
+                p_cap._p.append(bm_start)
             
             m = re.match(r'^(Bảng\s+\d+\.\d+\.?)(.*)$', resolved_caption)
             if m:
@@ -276,6 +308,10 @@ class DocxReportBuilder:
                 r.font.name = FONT_FAMILY
                 r.font.size = CAPTION_FONT_SIZE
                 r.font.bold = True
+
+            if bm_id and bm_name:
+                bm_end = parse_xml(r'<w:bookmarkEnd %s w:id="%s"/>' % (nsdecls('w'), bm_id))
+                p_cap._p.append(bm_end)
 
         if not rows_data:
             return
@@ -379,25 +415,107 @@ class DocxReportBuilder:
         r2.font.size = Pt(12)
         r2.font.bold = True
 
-    def render_figures_catalog_table(self):
-        """Tự động sinh bảng danh mục hình ảnh từ catalog đã index"""
+    def render_figures_catalog_list(self):
+        """Tự động sinh danh mục hình ảnh dạng dòng mục lục (Dot leader + PAGEREF)"""
         if not self.indexer.figures_catalog:
             return
-        
-        rows = [["Số hiệu", "Tên hình ảnh", "Trang"]]
-        for f in self.indexer.figures_catalog:
-            rows.append([f["label"], f["caption"], "--"])
-        self.render_table(rows, full_caption="")
 
-    def render_tables_catalog_table(self):
-        """Tự động sinh bảng danh mục bảng biểu từ catalog đã index"""
+        from docx.enum.text import WD_TAB_ALIGNMENT, WD_TAB_LEADER
+
+        for f in self.indexer.figures_catalog:
+            clean_num = f["num"].replace('.', '_')
+            bm_name = f"bm_fig_{clean_num}"
+
+            p = self.doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            p.paragraph_format.first_line_indent = Pt(0)
+            p.paragraph_format.left_indent = Pt(0)
+            p.paragraph_format.space_before = Pt(3)
+            p.paragraph_format.space_after = Pt(3)
+            p.paragraph_format.line_spacing = BODY_LINE_SPACING
+
+            # Tab stop tại lề phải (16cm = lề phải khổ A4 lề 3-2cm)
+            p.paragraph_format.tab_stops.add_tab_stop(Cm(16), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
+
+            r_label = p.add_run(f["label"] + ". ")
+            r_label.font.name = FONT_FAMILY
+            r_label.font.size = Pt(13)
+            r_label.font.bold = True
+            r_label.font.color.rgb = COLOR_BLACK
+
+            r_cap = p.add_run(f.get("caption", ""))
+            r_cap.font.name = FONT_FAMILY
+            r_cap.font.size = Pt(13)
+            r_cap.font.color.rgb = COLOR_BLACK
+
+            r_tab = p.add_run("\t")
+            r_tab.font.name = FONT_FAMILY
+
+            fld = parse_xml(r'''
+                <w:r %s>
+                    <w:fldChar w:fldCharType="begin"/>
+                    <w:instrText xml:space="preserve"> PAGEREF %s \h </w:instrText>
+                    <w:fldChar w:fldCharType="separate"/>
+                    <w:rPr>
+                        <w:rFonts w:ascii="%s" w:hAnsi="%s"/>
+                        <w:sz w:val="26"/>
+                    </w:rPr>
+                    <w:t>--</w:t>
+                    <w:fldChar w:fldCharType="end"/>
+                </w:r>
+            ''' % (nsdecls('w'), bm_name, FONT_FAMILY, FONT_FAMILY))
+            p._p.append(fld)
+
+    def render_tables_catalog_list(self):
+        """Tự động sinh danh mục bảng biểu dạng dòng mục lục (Dot leader + PAGEREF)"""
         if not self.indexer.tables_catalog:
             return
-            
-        rows = [["Số hiệu", "Tên bảng biểu", "Trang"]]
+
+        from docx.enum.text import WD_TAB_ALIGNMENT, WD_TAB_LEADER
+
         for t in self.indexer.tables_catalog:
-            rows.append([t["label"], t["caption"], "--"])
-        self.render_table(rows, full_caption="")
+            clean_num = t["num"].replace('.', '_')
+            bm_name = f"bm_tbl_{clean_num}"
+
+            p = self.doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            p.paragraph_format.first_line_indent = Pt(0)
+            p.paragraph_format.left_indent = Pt(0)
+            p.paragraph_format.space_before = Pt(3)
+            p.paragraph_format.space_after = Pt(3)
+            p.paragraph_format.line_spacing = BODY_LINE_SPACING
+
+            # Tab stop tại lề phải (16cm)
+            p.paragraph_format.tab_stops.add_tab_stop(Cm(16), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
+
+            r_label = p.add_run(t["label"] + ". ")
+            r_label.font.name = FONT_FAMILY
+            r_label.font.size = Pt(13)
+            r_label.font.bold = True
+            r_label.font.color.rgb = COLOR_BLACK
+
+            r_cap = p.add_run(t.get("caption", ""))
+            r_cap.font.name = FONT_FAMILY
+            r_cap.font.size = Pt(13)
+            r_cap.font.color.rgb = COLOR_BLACK
+
+            r_tab = p.add_run("\t")
+            r_tab.font.name = FONT_FAMILY
+
+            fld = parse_xml(r'''
+                <w:r %s>
+                    <w:fldChar w:fldCharType="begin"/>
+                    <w:instrText xml:space="preserve"> PAGEREF %s \h </w:instrText>
+                    <w:fldChar w:fldCharType="separate"/>
+                    <w:rPr>
+                        <w:rFonts w:ascii="%s" w:hAnsi="%s"/>
+                        <w:sz w:val="26"/>
+                    </w:rPr>
+                    <w:t>--</w:t>
+                    <w:fldChar w:fldCharType="end"/>
+                </w:r>
+            ''' % (nsdecls('w'), bm_name, FONT_FAMILY, FONT_FAMILY))
+            p._p.append(fld)
 
     def _render_inline_formatting(self, paragraph, text: str, is_table_header: bool = False):
         """Parse và tạo các run có format: **bold**, *italic*, `code`, link"""
