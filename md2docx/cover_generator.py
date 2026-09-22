@@ -26,6 +26,65 @@ class CoverGenerator:
         section._sectPr.append(borders)
 
     @classmethod
+    def calculate_footer_space(cls, metadata: dict) -> Pt:
+        """
+        Tính toán khoảng cách động (space_before) cho dòng 'Hà Nội – {nam}'
+        sao cho dòng này được đẩy sát đáy trang (cách viền dưới ~2.0 - 2.5cm),
+        tự động co dãn theo độ dài đề tài và bảng thông tin để chống tràn trang.
+        """
+        truong = metadata.get("truong", "")
+        khoa = metadata.get("khoa", "")
+        de_tai = metadata.get("de_tai", "")
+        logo_path = metadata.get("logo_path", "")
+        gvhd = metadata.get("gvhd", "")
+        svth = metadata.get("svth", "")
+        lop = metadata.get("lop", "")
+        mssv = metadata.get("mssv", "")
+
+        # 1. Chiều cao header trường + khoa
+        h_header = 21 + 35
+
+        # 2. Chiều cao logo (hoặc khoảng trống fallback)
+        resolved_logo = logo_path
+        if resolved_logo and not os.path.exists(resolved_logo):
+            fallback = os.path.join(os.path.dirname(__file__), "assets", "logo.jpg")
+            if os.path.exists(fallback):
+                resolved_logo = fallback
+        h_logo = 132 if (resolved_logo and os.path.exists(resolved_logo)) else 60
+
+        # 3. Tiêu đề ĐỒ ÁN TỐT NGHIỆP + Nhãn ĐỀ TÀI:
+        h_doan = 48 + 23
+
+        # 4. Ước tính số dòng của ĐỀ TÀI (Times New Roman 18pt bold hoa ~38 ký tự/dòng)
+        title_lines = 0
+        for line in str(de_tai).split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            title_lines += max(1, (len(line) + 37) // 38)
+        title_lines = max(1, title_lines)
+        h_title = 6 + (title_lines * 23) + 40
+
+        # 5. Ước tính chiều cao bảng thông tin (Times New Roman 13pt ~32 ký tự/dòng cột 2)
+        table_lines = 0
+        for val in [gvhd, svth, lop, mssv]:
+            for line in str(val).split("\n"):
+                table_lines += max(1, (len(line.strip()) + 31) // 32)
+        h_table = table_lines * 22 + 10
+
+        # 6. Dòng footer (17pt)
+        h_footer = 17
+
+        total_content = h_header + h_logo + h_doan + h_title + h_table + h_footer
+        # Khổ A4 khả dụng: 29.7cm - lề trên 2.5cm - lề dưới 2.5cm = ~700pt
+        printable_height = 700
+
+        # Đệm an toàn 8pt để căn sát đáy lề dưới và đảm bảo không tràn trang khi render qua LibreOffice
+        remaining = printable_height - total_content - 8
+        footer_space = max(40, min(240, int(remaining)))
+        return Pt(footer_space)
+
+    @classmethod
     def render_cover_page(cls, doc: Document, metadata: dict, is_subcover: bool = False):
         """
         Sinh 1 trang bìa hoặc phụ bìa
@@ -159,7 +218,7 @@ class CoverGenerator:
         # 5. Địa danh & Năm
         p_footer = doc.add_paragraph()
         p_footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_footer.paragraph_format.space_before = Pt(50)
+        p_footer.paragraph_format.space_before = cls.calculate_footer_space(metadata)
         p_footer.paragraph_format.space_after = Pt(0)
         r_footer = p_footer.add_run(f"Hà Nội – {nam}")
         r_footer.font.name = FONT_FAMILY
