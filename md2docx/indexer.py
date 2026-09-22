@@ -34,36 +34,20 @@ class DocIndexer:
         self.citation_map: Dict[str, int] = {}
         self.cited_entries: List[dict] = []
         
-        # Danh sách các tiêu đề đặc biệt thuộc Front Matter
-        self.front_matter_titles = {
-            "LỜI CẢM ƠN", "LỜI CAM ĐOAN", "TÓM TẮT", "MỤC LỤC",
-            "DANH MỤC CÁC KÝ HIỆU, CÁC CHỮ VIẾT TẮT",
-            "DANH MỤC CÁC TỪ VIẾT TẮT",
-            "DANH MỤC BẢNG BIỂU", "DANH MỤC CÁC BẢNG",
-            "DANH MỤC HÌNH ẢNH", "DANH MỤC CÁC HÌNH VẼ, ĐỒ THỊ"
-        }
-        
-        # Tiêu đề đặc biệt thuộc Body nhưng không mang số chương (hoặc là chương cuối)
-        self.special_body_titles = {
-            "MỞ ĐẦU", "KẾT LUẬN VÀ KIẾN NGHỊ", "KẾT LUẬN",
-            "DANH MỤC TÀI LIỆU THAM KHẢO", "TÀI LIỆU THAM KHẢO"
-        }
+        # Document structural auditing flags
+        self.has_toc_heading = False
+        self.has_lof_heading = False
+        self.has_lot_heading = False
+        self.has_references_heading = False
 
-    def is_front_matter(self, title: str) -> bool:
-        t_upper = title.strip().upper()
-        return any(fm in t_upper for fm in self.front_matter_titles)
-
-    def is_special_body(self, title: str) -> bool:
-        t_upper = title.strip().upper()
-        return any(sb in t_upper for sb in self.special_body_titles)
-
-    def _parse_heading_attributes(self, raw_title: str) -> tuple[str, bool, bool, Optional[str]]:
+    def _parse_heading_attributes(self, raw_title: str) -> tuple[str, bool, Optional[str], set]:
         """
-        Bóc tách các thuộc tính như {-}, {.unnumbered}, {.appendix}, {#id} từ tiêu đề Markdown.
+        Bóc tách các thuộc tính như {-}, {.unnumbered}, {.appendix}, {.frontmatter}, {#id} từ tiêu đề Markdown.
+        Trả về: (clean_title, is_unnumbered, heading_id, classes)
         """
         is_unnumbered = False
-        is_appendix = False
         heading_id = None
+        classes = set()
         
         m = re.search(r'\s*\{([^}]+)\}\s*$', raw_title)
         if m:
@@ -74,45 +58,113 @@ class DocIndexer:
                 if tok == '-' or tok.lower() in ('.unnumbered', 'unnumbered'):
                     is_unnumbered = True
                     recognized = True
-                elif tok.lower() in ('.appendix', 'appendix'):
-                    is_appendix = True
+                elif tok.startswith('.'):
+                    classes.add(tok[1:].lower())
                     recognized = True
                 elif tok.startswith('#'):
-                    heading_id = tok[1:]
+                    heading_id = tok[1:].lower()
+                    recognized = True
+                elif tok.lower() in ('appendix', 'frontmatter', 'toc', 'lof', 'lot', 'references', 'bibliography'):
+                    classes.add(tok.lower())
                     recognized = True
             
             if recognized:
                 clean = raw_title[:m.start()].strip()
-                return clean, is_unnumbered, is_appendix, heading_id
+                return clean, is_unnumbered, heading_id, classes
 
-        return raw_title.strip(), is_unnumbered, is_appendix, heading_id
+        return raw_title.strip(), is_unnumbered, heading_id, classes
+
+    def lint_heading(self, level: int, clean_title: str, info: dict):
+        """Kiểm tra và cảnh báo nếu tiêu đề nghi vấn chức năng nhưng thiếu thuộc tính bắt buộc"""
+        if level != 1:
+            return
+            
+        t_upper = clean_title.upper()
+        
+        if ("MỤC LỤC" in t_upper or "TABLE OF CONTENTS" in t_upper) and not info.get("is_toc"):
+            print(f"[CẢNH BÁO] Tiêu đề '{clean_title}' có khả năng là Mục lục nhưng thiếu '{{#toc .frontmatter}}'. Bảng Mục lục tự động sẽ không được sinh ra!")
+            
+        elif ("DANH MỤC HÌNH" in t_upper or "DANH MỤC CÁC HÌNH" in t_upper or "LIST OF FIGURES" in t_upper) and not info.get("is_lof"):
+            print(f"[CẢNH BÁO] Tiêu đề '{clean_title}' có khả năng là Danh mục hình ảnh nhưng thiếu '{{#lof .frontmatter}}'. Danh mục hình sẽ không được sinh ra!")
+            
+        elif ("DANH MỤC BẢNG" in t_upper or "DANH MỤC CÁC BẢNG" in t_upper or "LIST OF TABLES" in t_upper) and not info.get("is_lot"):
+            print(f"[CẢNH BÁO] Tiêu đề '{clean_title}' có khả năng là Danh mục bảng biểu nhưng thiếu '{{#lot .frontmatter}}'. Danh mục bảng sẽ không được sinh ra!")
+            
+        elif ("TÀI LIỆU THAM KHẢO" in t_upper or "REFERENCES" in t_upper or "BIBLIOGRAPHY" in t_upper) and not info.get("is_references"):
+            print(f"[CẢNH BÁO] Tiêu đề '{clean_title}' có khả năng là Tài liệu tham khảo nhưng thiếu '{{#references -}}'. Danh mục trích dẫn BibTeX sẽ không được kết xuất!")
+            
+        elif re.match(r'^(?:PHỤ\s+LỤC|APPENDIX)\b', t_upper) and not info.get("is_appendix"):
+            print(f"[CẢNH BÁO] Tiêu đề '{clean_title}' có khả năng là Phụ lục nhưng thiếu '{{.appendix}}'. Các đề mục con và bảng/hình sẽ không chuyển sang đánh số chữ cái (A, B, C...)!")
+            
+        elif any(fm in t_upper for fm in ["LỜI CẢM ƠN", "LỜI CAM ĐOAN", "TÓM TẮT"]) and not info.get("is_front_matter"):
+            print(f"[CẢNH BÁO] Tiêu đề '{clean_title}' thuộc phần đầu tài liệu nhưng thiếu '{{.frontmatter}}'. Tiêu đề này sẽ bị xử lý như một Chương nội dung!")
+            
+        elif any(sb in t_upper for sb in ["MỞ ĐẦU", "KẾT LUẬN"]) and not info.get("is_unnumbered"):
+            print(f"[CẢNH BÁO] Tiêu đề '{clean_title}' thường là phần không đánh số nhưng thiếu '{{-}}'. Tiêu đề này sẽ được đánh số như một Chương bình thường!")
+
+    def audit_document(self):
+        """Kiểm toán tổng thể tài liệu sau Pass 1 và in cảnh báo nếu thiếu các thành phần cấu trúc"""
+        warnings = []
+        if not self.has_toc_heading:
+            warnings.append("[CẢNH BÁO] Tài liệu không chứa tiêu đề Mục lục '{#toc .frontmatter}'. Báo cáo xuất ra sẽ thiếu bảng Mục lục.")
+        if self.figures_catalog and not self.has_lof_heading:
+            warnings.append(f"[CẢNH BÁO] Tài liệu có chứa {len(self.figures_catalog)} hình ảnh nhưng thiếu tiêu đề Danh mục hình '{{#lof .frontmatter}}'.")
+        if self.tables_catalog and not self.has_lot_heading:
+            warnings.append(f"[CẢNH BÁO] Tài liệu có chứa {len(self.tables_catalog)} bảng biểu nhưng thiếu tiêu đề Danh mục bảng '{{#lot .frontmatter}}'.")
+        if self.cited_entries and not self.has_references_heading:
+            warnings.append(f"[CẢNH BÁO] Tài liệu trích dẫn {len(self.cited_entries)} nguồn tài liệu BibTeX nhưng không có tiêu đề '{{#references -}}'. Danh mục trích dẫn sẽ không xuất hiện.")
+        
+        for w in warnings:
+            print(w)
 
     def register_heading(self, level: int, raw_title: str) -> dict:
         """
-        Đăng ký tiêu đề và chuẩn hóa tên theo quy chuẩn ĐATN
+        Đăng ký tiêu đề và phân loại 100% qua thuộc tính tường minh
         """
         raw_title = raw_title.strip()
-        clean_title, is_unnumbered, is_appendix, heading_id = self._parse_heading_attributes(raw_title)
-        t_upper = clean_title.upper()
+        clean_title, is_unnumbered, heading_id, classes = self._parse_heading_attributes(raw_title)
         
+        # Nhận diện cờ chức năng từ thuộc tính
+        is_toc = heading_id == 'toc' or 'toc' in classes
+        is_lof = heading_id in ('lof', 'figures') or 'lof' in classes or 'figures' in classes
+        is_lot = heading_id in ('lot', 'tables') or 'lot' in classes or 'tables' in classes
+        is_references = heading_id in ('references', 'bibliography') or 'references' in classes or 'bib' in classes
+        is_appendix = 'appendix' in classes or heading_id == 'appendix'
+        is_front_matter = 'frontmatter' in classes or is_toc or is_lof or is_lot
+
+        if is_toc:
+            self.has_toc_heading = True
+        if is_lof:
+            self.has_lof_heading = True
+        if is_lot:
+            self.has_lot_heading = True
+        if is_references:
+            self.has_references_heading = True
+
         # Heading 1
         if level == 1:
-            app_pattern = r'^(?:PHỤ\s+LỤC|APPENDIX)(?:\s+([A-Za-z]|\d+))?(?:[\s\.:_-]+(.*))?$'
-            m_app = re.match(app_pattern, clean_title, re.IGNORECASE)
-
-            if self.is_front_matter(clean_title):
+            if is_front_matter:
                 self.in_appendix = False
                 res = {
                     "level": 1,
                     "type": "front_matter",
-                    "display": t_upper,
-                    "chapter_num": 0
+                    "display": clean_title.upper(),
+                    "chapter_num": 0,
+                    "is_front_matter": True,
+                    "is_toc": is_toc,
+                    "is_lof": is_lof,
+                    "is_lot": is_lot,
+                    "is_references": False,
+                    "is_appendix": False,
+                    "is_unnumbered": True,
+                    "id": heading_id
                 }
-            elif is_appendix or m_app:
-                # Chế độ Phụ lục (Appendix Mode)
+            elif is_appendix:
                 self.in_appendix = True
-                if m_app and m_app.group(1):
-                    spec = m_app.group(1)
+                # Trích xuất ký tự chữ cái nếu có trong tiêu đề (ví dụ: Phụ lục A, Phụ lục B)
+                m_letter = re.search(r'(?:PHỤ\s+LỤC|APPENDIX)\s+([A-Za-z]|\d+)', clean_title, re.IGNORECASE)
+                if m_letter:
+                    spec = m_letter.group(1)
                     if spec.isalpha():
                         letter = spec.upper()
                         self.appendix_idx = ord(letter) - ord('A') + 1
@@ -122,7 +174,7 @@ class DocIndexer:
                 else:
                     self.appendix_idx += 1
                     letter = chr(ord('A') + self.appendix_idx - 1)
-                
+
                 self.current_appendix_letter = letter
                 self.h2_idx = 0
                 self.h3_idx = 0
@@ -130,33 +182,60 @@ class DocIndexer:
                 self.tbl_idx = 0
                 self.eq_idx = 0
 
-                sub_title = ""
-                if m_app and m_app.group(2):
-                    sub_title = m_app.group(2).strip()
-                elif not m_app:
-                    sub_title = clean_title
-
-                if is_unnumbered:
-                    display = f"PHỤ LỤC: {sub_title.upper()}" if sub_title else "PHỤ LỤC"
+                # Chuẩn hóa tên hiển thị phụ lục
+                if not re.match(r'^(?:PHỤ\s+LỤC|APPENDIX)\b', clean_title, re.IGNORECASE):
+                    display = f"PHỤ LỤC {letter}. {clean_title.upper()}"
                 else:
-                    display = f"PHỤ LỤC {letter}. {sub_title.upper()}" if sub_title else f"PHỤ LỤC {letter}"
+                    display = clean_title.upper()
 
                 res = {
                     "level": 1,
                     "type": "special_body",
                     "display": display,
                     "chapter_num": self.chapter_idx,
-                    "appendix_letter": letter
+                    "appendix_letter": letter,
+                    "is_front_matter": False,
+                    "is_toc": False,
+                    "is_lof": False,
+                    "is_lot": False,
+                    "is_references": False,
+                    "is_appendix": True,
+                    "is_unnumbered": is_unnumbered,
+                    "id": heading_id
                 }
-            elif is_unnumbered or self.is_special_body(clean_title):
-                # Tiêu đề chính không có tiền tố Chương (Mở đầu, Kết luận hoặc đánh dấu {-} / {.unnumbered})
+            elif is_references:
+                self.in_appendix = False
+                res = {
+                    "level": 1,
+                    "type": "special_body",
+                    "display": clean_title.upper(),
+                    "chapter_num": self.chapter_idx,
+                    "is_front_matter": False,
+                    "is_toc": False,
+                    "is_lof": False,
+                    "is_lot": False,
+                    "is_references": True,
+                    "is_appendix": False,
+                    "is_unnumbered": True,
+                    "id": heading_id
+                }
+            elif is_unnumbered:
+                self.in_appendix = False
                 m = re.match(r'^(?:CHƯƠNG\s+\d+[\.:\s]*|\d+[\.:\s]*)(.*)$', clean_title, re.IGNORECASE)
                 final_title = m.group(1).strip() if m else clean_title
                 res = {
                     "level": 1,
                     "type": "special_body",
                     "display": final_title.upper(),
-                    "chapter_num": self.chapter_idx
+                    "chapter_num": self.chapter_idx,
+                    "is_front_matter": False,
+                    "is_toc": False,
+                    "is_lof": False,
+                    "is_lot": False,
+                    "is_references": False,
+                    "is_appendix": False,
+                    "is_unnumbered": True,
+                    "id": heading_id
                 }
             else:
                 # Chương thông thường
@@ -168,7 +247,6 @@ class DocIndexer:
                 self.tbl_idx = 0
                 self.eq_idx = 0
                 
-                # Kiểm tra nếu người dùng đã ghi sẵn "CHƯƠNG X..."
                 m = re.match(r'^(?:CHƯƠNG\s+\d+[\.:\s]*)(.*)$', clean_title, re.IGNORECASE)
                 c_title = m.group(1).strip() if m else clean_title
                 display = f"CHƯƠNG {self.chapter_idx}. {c_title.upper()}"
@@ -176,10 +254,18 @@ class DocIndexer:
                     "level": 1,
                     "type": "chapter",
                     "display": display,
-                    "chapter_num": self.chapter_idx
+                    "chapter_num": self.chapter_idx,
+                    "is_front_matter": False,
+                    "is_toc": False,
+                    "is_lof": False,
+                    "is_lot": False,
+                    "is_references": False,
+                    "is_appendix": False,
+                    "is_unnumbered": False,
+                    "id": heading_id
                 }
-                
-        # Heading 2 (Mục X.Y hoặc A.Y)
+
+        # Heading 2
         elif level == 2:
             if is_unnumbered:
                 c_title = re.sub(r'^[A-Za-z0-9]+(?:\.\d+)*[\.:\s]*', '', clean_title).strip()
@@ -187,23 +273,38 @@ class DocIndexer:
                     "level": 2,
                     "type": "section",
                     "display": c_title,
-                    "num": ""
+                    "num": "",
+                    "is_front_matter": False,
+                    "is_toc": False,
+                    "is_lof": False,
+                    "is_lot": False,
+                    "is_references": False,
+                    "is_appendix": self.in_appendix,
+                    "is_unnumbered": True,
+                    "id": heading_id
                 }
             else:
                 self.h2_idx += 1
                 self.h3_idx = 0
                 curr_prefix = self.current_appendix_letter if self.in_appendix else str(max(1, self.chapter_idx))
-                # Lọc bỏ tiền tố số hoặc chữ cái đã có nếu có
                 c_title = re.sub(r'^[A-Za-z0-9]+\.\d+[\.:\s]*', '', clean_title).strip()
                 display = f"{curr_prefix}.{self.h2_idx}. {c_title}"
                 res = {
                     "level": 2,
                     "type": "section",
                     "display": display,
-                    "num": f"{curr_prefix}.{self.h2_idx}"
+                    "num": f"{curr_prefix}.{self.h2_idx}",
+                    "is_front_matter": False,
+                    "is_toc": False,
+                    "is_lof": False,
+                    "is_lot": False,
+                    "is_references": False,
+                    "is_appendix": self.in_appendix,
+                    "is_unnumbered": False,
+                    "id": heading_id
                 }
-            
-        # Heading 3 (Tiểu mục X.Y.Z hoặc A.Y.Z)
+
+        # Heading 3
         elif level == 3:
             if is_unnumbered:
                 c_title = re.sub(r'^[A-Za-z0-9]+(?:\.\d+)*[\.:\s]*', '', clean_title).strip()
@@ -211,7 +312,15 @@ class DocIndexer:
                     "level": 3,
                     "type": "subsection",
                     "display": c_title,
-                    "num": ""
+                    "num": "",
+                    "is_front_matter": False,
+                    "is_toc": False,
+                    "is_lof": False,
+                    "is_lot": False,
+                    "is_references": False,
+                    "is_appendix": self.in_appendix,
+                    "is_unnumbered": True,
+                    "id": heading_id
                 }
             else:
                 self.h3_idx += 1
@@ -223,16 +332,27 @@ class DocIndexer:
                     "level": 3,
                     "type": "subsection",
                     "display": display,
-                    "num": f"{curr_prefix}.{curr_h2}.{self.h3_idx}"
+                    "num": f"{curr_prefix}.{curr_h2}.{self.h3_idx}",
+                    "is_front_matter": False,
+                    "is_toc": False,
+                    "is_lof": False,
+                    "is_lot": False,
+                    "is_references": False,
+                    "is_appendix": self.in_appendix,
+                    "is_unnumbered": False,
+                    "id": heading_id
                 }
-            
+
         else:
-            res = {"level": level, "type": "heading", "display": clean_title}
+            res = {"level": level, "type": "heading", "display": clean_title, "id": heading_id}
 
         if heading_id:
             self.symbols[heading_id] = res.get("display", clean_title)
             if not heading_id.startswith("sec:"):
                 self.symbols[f"sec:{heading_id}"] = res.get("display", clean_title)
+
+        # Chạy bộ linter cảnh báo tiêu đề
+        self.lint_heading(level, clean_title, res)
 
         return res
 

@@ -90,17 +90,18 @@ class DocxReportBuilder:
         h_type = info.get("type", "heading")
         text = info.get("display", "")
 
-        # Quản lý chuyển đổi Section
-        if h_type == "front_matter":
+        # Quản lý chuyển đổi Section dựa 100% trên thuộc tính
+        if info.get("is_front_matter"):
             self.ensure_front_matter_section()
             if self.first_front_matter_rendered:
                 self.doc.add_page_break()
             self.first_front_matter_rendered = True
-        elif h_type in ("chapter", "special_body"):
+        else:
             self.ensure_body_section()
-            if self.first_chapter_rendered:
-                self.doc.add_page_break()
-            self.first_chapter_rendered = True
+            if level == 1:
+                if self.first_chapter_rendered:
+                    self.doc.add_page_break()
+                self.first_chapter_rendered = True
 
         p = self.doc.add_paragraph()
         pPr = p._p.get_or_add_pPr()
@@ -119,12 +120,12 @@ class DocxReportBuilder:
             run.font.bold = H1_BOLD
             run.font.color.rgb = COLOR_BLACK
 
-            # Tự động sinh danh mục hình / bảng nếu gặp tiêu đề danh mục
-            if "DANH MỤC HÌNH" in text.upper() or "DANH MỤC CÁC HÌNH" in text.upper():
+            # Tự động sinh danh mục hình / bảng / mục lục dựa 100% trên cờ thuộc tính
+            if info.get("is_lof"):
                 self.render_figures_catalog_list()
-            elif "DANH MỤC BẢNG" in text.upper() or "DANH MỤC CÁC BẢNG" in text.upper():
+            elif info.get("is_lot"):
                 self.render_tables_catalog_list()
-            elif "MỤC LỤC" in text.upper():
+            elif info.get("is_toc"):
                 p_toc = self.doc.add_paragraph()
                 self.add_toc_field(p_toc)
 

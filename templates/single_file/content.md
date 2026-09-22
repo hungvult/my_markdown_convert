@@ -36,23 +36,23 @@ Tệp này là tài liệu mẫu (Template) chuẩn hóa theo Quy chế Đồ á
 
 <!-- SECTION 2: FRONT MATTER -->
 
-# LỜI CẢM ƠN
+# LỜI CẢM ƠN {.frontmatter}
 
 <!-- Hướng dẫn: Viết ngắn gọn tri ân thầy cô hướng dẫn, bộ môn, gia đình và bạn bè -->
 Lời đầu tiên, em xin gửi lời cảm ơn chân thành và sâu sắc nhất tới thầy/cô hướng dẫn đã tận tình chỉ bảo, định hướng khoa học và động viên em trong suốt quá trình nghiên cứu và hoàn thành đồ án tốt nghiệp này.
 
 Em cũng xin gửi lời cảm ơn chân thành tới các thầy cô giáo trong Khoa Công nghệ thông tin - Trường Đại học Giao thông Vận tải đã truyền thụ những kiến thức nền tảng quý báu trong những năm học vừa qua.
 
-# LỜI CAM ĐOAN
+# LỜI CAM ĐOAN {.frontmatter}
 
 <!-- Hướng dẫn: Cam kết đồ án tự nghiên cứu, không sao chép trái phép -->
 Em xin cam đoan đồ án tốt nghiệp với đề tài **"Xây dựng hệ thống quản lý doanh nghiệp trực tuyến"** là công trình nghiên cứu do chính em thực hiện dưới sự hướng dẫn khoa học của thầy/cô hướng dẫn. Các kết quả, số liệu và tài liệu trích dẫn trong đồ án đều trung thực và có nguồn gốc rõ ràng.
 
-# MỤC LỤC
+# MỤC LỤC {#toc .frontmatter}
 
 <!-- Hướng dẫn: Khối này sẽ tự động nhúng mã trường TOC tự động của Word -->
 
-# DANH MỤC CÁC TỪ VIẾT TẮT
+# DANH MỤC CÁC TỪ VIẾT TẮT {.frontmatter}
 
 <!-- Hướng dẫn: Bảng liệt kê các từ viết tắt trong đồ án -->
 
@@ -64,17 +64,17 @@ Em xin cam đoan đồ án tốt nghiệp với đề tài **"Xây dựng hệ t
 | REST | Representational State Transfer | Phong cách kiến trúc mạng |
 | UI/UX | User Interface / User Experience | Giao diện / Trải nghiệm người dùng |
 
-# DANH MỤC BẢNG BIỂU
+# DANH MỤC BẢNG BIỂU {#lot .frontmatter}
 
 <!-- Hướng dẫn: Tool sẽ tự động tổng hợp danh mục bảng biểu từ các bảng đã đánh số -->
 
-# DANH MỤC HÌNH ẢNH
+# DANH MỤC HÌNH ẢNH {#lof .frontmatter}
 
 <!-- Hướng dẫn: Tool sẽ tự động tổng hợp danh mục hình ảnh từ các hình đã đánh số -->
 
 <!-- SECTION 3: BODY CONTENT (ĐÁNH SỐ TRANG TỪ 1 Ở HEADER CĂN GIỮA) -->
 
-# MỞ ĐẦU
+# MỞ ĐẦU {-}
 
 <!-- Hướng dẫn phần Mở đầu: Nêu lý do chọn đề tài, tính cấp thiết, mục tiêu và cấu trúc báo cáo -->
 Trong bối cảnh chuyển đổi số mạnh mẽ của cuộc cách mạng công nghiệp 4.0, các doanh nghiệp ngày càng chú trọng việc ứng dụng công nghệ thông tin vào công tác quản trị và điều hành sản xuất kinh doanh. Việc xây dựng một hệ thống quản lý tích hợp, linh hoạt và bảo mật cao là nhu cầu cấp thiết nhằm tối ưu hóa chi phí vận hành và nâng cao năng lực cạnh tranh.
@@ -159,7 +159,7 @@ $$ H(s) = -\sum_{i=1}^{n} p_i \log_2(p_i) $$ {#eq:entropy}
 
 Công thức tính toán [@eq:entropy] cho phép định lượng mức độ ngẫu nhiên của chuỗi bảo mật được cấp phát cho người dùng.
 
-# KẾT LUẬN VÀ KIẾN NGHỊ
+# KẾT LUẬN VÀ KIẾN NGHỊ {-}
 
 ## Các kết quả đạt được {-}
 
@@ -173,13 +173,13 @@ Công thức tính toán [@eq:entropy] cho phép định lượng mức độ ng
 - Nghiên cứu tích hợp trí tuệ nhân tạo (AI) để dự báo nhu cầu thị trường và tối ưu hóa tồn kho tự động.
 - Phát triển ứng dụng trên nền tảng di động (iOS / Android).
 
-# TÀI LIỆU THAM KHẢO
+# TÀI LIỆU THAM KHẢO {#references -}
 
 <!-- Hướng dẫn: Không cần điền danh sách thủ công tại đây.
 Toàn bộ danh mục tài liệu tham khảo sẽ được tự động trích xuất và định dạng từ tệp references.bib
 dựa theo thứ tự các khóa trích dẫn [@citekey] xuất hiện trong bài viết. -->
 
-# PHỤ LỤC A: CẤU HÌNH VÀ DỮ LIỆU BỔ TRỢ
+# PHỤ LỤC A: CẤU HÌNH VÀ DỮ LIỆU BỔ TRỢ {.appendix}
 
 ## Danh mục tham số môi trường
 

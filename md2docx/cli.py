@@ -250,6 +250,9 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str = "", bib_p
 
         i += 1
 
+    # Kiểm toán cấu trúc tài liệu sau Pass 1
+    indexer.audit_document()
+
     # PASS 2: Dựng tài liệu và resolve tham chiếu chéo
     print("[*] Thực hiện Pass 2: Dựng tài liệu DOCX và resolve tham chiếu chéo / trích dẫn...")
     builder = DocxReportBuilder(metadata=metadata, indexer=indexer, base_dir=str(project_root))
@@ -267,7 +270,7 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str = "", bib_p
             builder.render_heading(level, info)
 
             # Tự động kết xuất danh mục tài liệu tham khảo nếu có trích dẫn BibTeX
-            if level == 1 and "TÀI LIỆU THAM KHẢO" in info.get("display", "").upper():
+            if level == 1 and info.get("is_references"):
                 in_bib_section = True
                 if indexer.cited_entries:
                     for c_idx, entry in enumerate(indexer.cited_entries):

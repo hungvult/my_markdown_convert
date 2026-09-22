@@ -1,4 +1,4 @@
-# TÀI LIỆU THAM KHẢO
+# TÀI LIỆU THAM KHẢO {#references -}
 
 <!-- Hướng dẫn: Không cần điền danh sách thủ công tại đây.
 Toàn bộ danh mục tài liệu tham khảo sẽ được tự động trích xuất và định dạng từ tệp references.bib
