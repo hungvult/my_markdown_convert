@@ -1,11 +1,44 @@
-# Cấu hình Metadata đồ án tốt nghiệp
-# Dùng để sinh Trang bìa và Trang phụ bìa chuẩn Phụ lục 1
-truong: "TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI"
-khoa: "KHOA CÔNG NGHỆ THÔNG TIN"
-de_tai: "XÂY DỰNG HỆ THỐNG QUẢN LÝ DOANH NGHIỆP TRỰC TUYẾN"
-gvhd: "TS. Nguyễn Văn A"
-svth: "Trần Văn B"
-mssv: "20123456"
-lop: "Công nghệ thông tin 2 - K64"
-nam: "2026"
+# Cấu hình Metadata đồ án / báo cáo bài tập lớn linh động
+# Hỗ trợ tùy biến đơn vị, loại tài liệu, đề tài đa dòng và danh sách sinh viên nhóm
+
+# 1. Cơ quan / Đơn vị (tùy biến nhiều dòng trên cùng)
+don_vi:
+  - "TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI"
+  - "KHOA CÔNG NGHỆ THÔNG TIN"
+
+# 2. Logo
 logo_path: "assets/logo.jpg"
+
+# 3. Loại báo cáo / tài liệu
+loai: "BÁO CÁO BÀI TẬP LỚN"
+
+# 4. Nhãn và Tên đề tài (tách thành 2 dòng theo yêu cầu)
+nhan_de_tai: "ĐỀ TÀI:"
+de_tai:
+  - "XÂY DỰNG HỆ THỐNG QUẢN LÝ"
+  - "DOANH NGHIỆP TRỰC TUYẾN"
+
+# 5. Bảng thông tin linh động (dạng danh sách cặp nhãn - giá trị)
+thong_tin:
+  - nhan: "Giảng viên hướng dẫn:"
+    gia_tri:
+      - "TS. Nguyễn Văn A"
+      - "ThS. Trần Văn B"
+
+  - nhan: "Nhóm:"
+    gia_tri: "Nhóm 01"
+
+  - nhan: "Lớp:"
+    gia_tri: "Công nghệ thông tin 2 - K64"
+
+  - nhan: "Sinh viên thực hiện:"
+    gia_tri:
+      - "Trần Văn B - 20123456"
+      - "Lê Thị C - 20123457"
+      - "Phạm Văn D - 20123458"
+      - "Hoàng Quốc E - 20123459"
+      - "Đặng Thị F - 20123460"
+
+# 6. Địa danh và thời gian
+dia_diem: "Hà Nội"
+nam: "2026"

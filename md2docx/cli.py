@@ -71,30 +71,143 @@ def collect_markdown_files(input_path: str) -> list[str]:
         raise FileNotFoundError(f"Không tìm thấy đường dẫn: {input_path}")
 
 def load_metadata(config_path: str, frontmatter_meta: dict) -> dict:
-    """Hợp nhất metadata từ file config và frontmatter"""
+    """Hợp nhất và chuẩn hóa metadata từ file config và frontmatter"""
     meta = {
-        "truong": "TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI",
-        "khoa": "KHOA CÔNG NGHỆ THÔNG TIN",
-        "de_tai": "XÂY DỰNG HỆ THỐNG QUẢN LÝ DOANH NGHIỆP",
-        "gvhd": "TS. Nguyễn Văn A",
-        "svth": "Trần Văn B",
-        "mssv": "20123456",
-        "lop": "Công nghệ thông tin 2 - K64",
-        "nam": "2026",
-        "logo_path": "assets/logo.jpg"
+        "don_vi": [
+            "TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI",
+            "KHOA CÔNG NGHỆ THÔNG TIN"
+        ],
+        "loai": "ĐỒ ÁN TỐT NGHIỆP",
+        "nhan_de_tai": "ĐỀ TÀI:",
+        "de_tai": ["XÂY DỰNG HỆ THỐNG QUẢN LÝ DOANH NGHIỆP TRỰC TUYẾN"],
+        "logo_path": "assets/logo.jpg",
+        "thong_tin": [],
+        "dia_diem": "Hà Nội",
+        "nam": "2026"
     }
 
+    raw_cfg = {}
     if config_path and os.path.exists(config_path):
         try:
             with open(config_path, "r", encoding="utf-8") as f:
-                cfg = yaml.safe_load(f) or {}
-                meta.update(cfg)
+                raw_cfg = yaml.safe_load(f) or {}
         except Exception as e:
             print(f"[CẢNH BÁO] Không đọc được file cấu hình {config_path}: {e}")
 
     # Frontmatter có độ ưu tiên cao hơn
     if frontmatter_meta:
-        meta.update(frontmatter_meta)
+        raw_cfg.update(frontmatter_meta)
+
+    # 1. Chuẩn hóa don_vi
+    if "don_vi" in raw_cfg:
+        dv = raw_cfg["don_vi"]
+        if isinstance(dv, list):
+            meta["don_vi"] = [str(x).strip() for x in dv if str(x).strip()]
+        elif isinstance(dv, str) and dv.strip():
+            meta["don_vi"] = [dv.strip()]
+    elif "truong" in raw_cfg or "khoa" in raw_cfg:
+        dv_list = []
+        if raw_cfg.get("truong"):
+            dv_list.append(str(raw_cfg["truong"]).strip())
+        if raw_cfg.get("khoa"):
+            dv_list.append(str(raw_cfg["khoa"]).strip())
+        if dv_list:
+            meta["don_vi"] = dv_list
+
+    # 2. Chuẩn hóa loai / loai_tai_lieu
+    if "loai" in raw_cfg:
+        meta["loai"] = str(raw_cfg["loai"]).strip()
+    elif "loai_tai_lieu" in raw_cfg:
+        meta["loai"] = str(raw_cfg["loai_tai_lieu"]).strip()
+
+    # 3. Chuẩn hóa nhan_de_tai
+    if "nhan_de_tai" in raw_cfg:
+        meta["nhan_de_tai"] = str(raw_cfg["nhan_de_tai"]).strip()
+
+    # 4. Chuẩn hóa de_tai (hỗ trợ list hoặc chuỗi có \n)
+    if "de_tai" in raw_cfg:
+        dt = raw_cfg["de_tai"]
+        if isinstance(dt, list):
+            meta["de_tai"] = [str(x).strip() for x in dt if str(x).strip()]
+        elif isinstance(dt, str):
+            lines = [line.strip() for line in dt.splitlines() if line.strip()]
+            meta["de_tai"] = lines if lines else [dt.strip()]
+
+    # 5. Chuẩn hóa logo_path
+    if "logo_path" in raw_cfg:
+        meta["logo_path"] = str(raw_cfg["logo_path"]).strip()
+
+    # 6. Chuẩn hóa thong_tin
+    if "thong_tin" in raw_cfg and isinstance(raw_cfg["thong_tin"], list):
+        norm_info = []
+        for item in raw_cfg["thong_tin"]:
+            if isinstance(item, dict):
+                nhan = str(item.get("nhan", "")).strip()
+                val = item.get("gia_tri", [])
+                if isinstance(val, (list, tuple)):
+                    vals = [str(v).strip() for v in val if str(v).strip()]
+                elif val is not None and str(val).strip():
+                    vals = [str(val).strip()]
+                else:
+                    vals = []
+                if nhan or vals:
+                    norm_info.append({"nhan": nhan, "gia_tri": vals})
+        meta["thong_tin"] = norm_info
+    else:
+        # Fallback từ các trường cũ: gvhd, nhom, lop, svth / mssv / sinh_vien
+        norm_info = []
+        # GVHD
+        if "gvhd" in raw_cfg:
+            g = raw_cfg["gvhd"]
+            gv_list = [str(x).strip() for x in g] if isinstance(g, list) else [str(g).strip()]
+            norm_info.append({"nhan": "Giảng viên hướng dẫn:", "gia_tri": gv_list})
+        else:
+            norm_info.append({"nhan": "Giảng viên hướng dẫn:", "gia_tri": ["TS. Nguyễn Văn A"]})
+
+        # Nhóm (nếu có)
+        if "nhom" in raw_cfg and str(raw_cfg["nhom"]).strip():
+            norm_info.append({"nhan": "Nhóm:", "gia_tri": [str(raw_cfg["nhom"]).strip()]})
+
+        # Sinh viên
+        if "sinh_vien" in raw_cfg and isinstance(raw_cfg["sinh_vien"], list):
+            sv_list = []
+            for s in raw_cfg["sinh_vien"]:
+                if isinstance(s, dict):
+                    ten = s.get("ten", "")
+                    ms = s.get("mssv", "")
+                    lp = s.get("lop", "")
+                    line = f"{ten} - {ms}" if ms else ten
+                    if lp:
+                        line += f" ({lp})"
+                    sv_list.append(line.strip())
+                elif isinstance(s, str) and s.strip():
+                    sv_list.append(s.strip())
+            if sv_list:
+                norm_info.append({"nhan": "Sinh viên thực hiện:", "gia_tri": sv_list})
+        elif "svth" in raw_cfg or "mssv" in raw_cfg:
+            sv = str(raw_cfg.get("svth", "Trần Văn B")).strip()
+            ms = str(raw_cfg.get("mssv", "")).strip()
+            line = f"{sv} - {ms}" if ms else sv
+            norm_info.append({"nhan": "Sinh viên thực hiện:", "gia_tri": [line]})
+        else:
+            norm_info.append({"nhan": "Sinh viên thực hiện:", "gia_tri": ["Trần Văn B - 20123456"]})
+
+        # Lớp (nếu có)
+        if "lop" in raw_cfg and str(raw_cfg["lop"]).strip():
+            norm_info.append({"nhan": "Lớp:", "gia_tri": [str(raw_cfg["lop"]).strip()]})
+
+        meta["thong_tin"] = norm_info
+
+    # 7. Chuẩn hóa dia_diem & nam
+    if "dia_diem" in raw_cfg and str(raw_cfg["dia_diem"]).strip():
+        meta["dia_diem"] = str(raw_cfg["dia_diem"]).strip()
+    if "nam" in raw_cfg and str(raw_cfg["nam"]).strip():
+        meta["nam"] = str(raw_cfg["nam"]).strip()
+
+    # Lưu lại các trường thô để tương thích
+    for k, v in raw_cfg.items():
+        if k not in meta:
+            meta[k] = v
 
     return meta
 
