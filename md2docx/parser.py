@@ -56,6 +56,23 @@ class MarkdownDocParser:
                 return metadata, content
         return metadata, text
 
+    @staticmethod
+    def clean_inline_breaks(text: str) -> str:
+        """
+        Chuẩn hóa xuống dòng trong văn bản Markdown inline theo chuẩn CommonMark:
+        - Hard break (2+ dấu cách cuối dòng, backslash \\ cuối dòng, hoặc thẻ <br>): Bảo toàn thành '\n'
+        - Soft break (dấu enter đơn lẻ trong mã nguồn Markdown): Chuyển thành 1 khoảng trắng ' '
+        """
+        if not text:
+            return ""
+        # 1. Bảo toàn hardbreak thành marker tạm
+        text = re.sub(r'(?:[ \t]{2,}|\\)\r?\n[ \t]*', '__HARDBREAK__', text)
+        text = re.sub(r'<br\s*/?>', '__HARDBREAK__', text, flags=re.IGNORECASE)
+        # 2. Xóa bỏ softbreak (dấu xuống dòng đơn) và thu gọn khoảng trắng xung quanh
+        text = re.sub(r'[ \t]*\r?\n[ \t]*', ' ', text)
+        # 3. Khôi phục hardbreak thành '\n'
+        return text.replace('__HARDBREAK__', '\n')
+
     def parse_to_tokens(self, text: str):
         """
         Tiền xử lý văn bản và sinh danh sách tokens của markdown-it

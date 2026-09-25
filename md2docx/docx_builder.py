@@ -30,6 +30,7 @@ from .config import (
 from .section_manager import SectionManager
 from .cover_generator import CoverGenerator
 from .indexer import DocIndexer
+from .parser import MarkdownDocParser
 
 class DocxReportBuilder:
     def __init__(self, metadata: dict, indexer: DocIndexer, base_dir: str = "."):
@@ -170,7 +171,8 @@ class DocxReportBuilder:
         - Căn đều (Justify)
         - Resolve tham chiếu chéo
         """
-        text = self.indexer.resolve_cross_references(raw_text.strip())
+        cleaned_text = MarkdownDocParser.clean_inline_breaks(raw_text)
+        text = self.indexer.resolve_cross_references(cleaned_text.strip())
         if not text:
             return None
 

@@ -359,7 +359,7 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str = "", bib_p
         # Bắt tiêu đề
         if t.type == "heading_open":
             level = int(t.tag[1]) # 'h1' -> 1
-            title_text = tokens[i+1].content if (i+1 < token_count and tokens[i+1].type == "inline") else ""
+            title_text = MarkdownDocParser.clean_inline_breaks(tokens[i+1].content) if (i+1 < token_count and tokens[i+1].type == "inline") else ""
             h_info = indexer.register_heading(level, title_text)
             heading_registrations[i] = h_info
             i += 2
@@ -462,7 +462,7 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str = "", bib_p
             while i < token_count and tokens[i].type != "table_close":
                 tok = tokens[i]
                 if tok.type in ("th_open", "td_open"):
-                    cell_text = tokens[i+1].content if (i+1 < token_count and tokens[i+1].type == "inline") else ""
+                    cell_text = MarkdownDocParser.clean_inline_breaks(tokens[i+1].content) if (i+1 < token_count and tokens[i+1].type == "inline") else ""
                     current_row.append(cell_text)
                     i += 2
                 elif tok.type in ("tr_close",):
@@ -487,7 +487,7 @@ def run_pipeline(input_path: str, output_docx: str, config_path: str = "", bib_p
 
         # 5. Regular Paragraph
         if t.type == "paragraph_open":
-            p_text = tokens[i+1].content if (i+1 < token_count and tokens[i+1].type == "inline") else ""
+            p_text = MarkdownDocParser.clean_inline_breaks(tokens[i+1].content) if (i+1 < token_count and tokens[i+1].type == "inline") else ""
             if p_text.strip():
                 # Bỏ qua nếu là marker HTML
                 if not p_text.startswith("<!--"):
