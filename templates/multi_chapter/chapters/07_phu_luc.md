@@ -21,6 +21,8 @@ Sơ đồ tại [@fig:app_diagram] thể hiện các thành phần mở rộng t
 
 Hàm mục tiêu được biểu diễn theo công thức:
 
-$$ J(w, b) = \frac{1}{m} \sum_{i=1}^m L(\hat{y}^{(i)}, y^{(i)}) $$ {#eq:app_loss}
+$$
+J(w, b) = \frac{1}{m} \sum_{i=1}^m L(\hat{y}^{(i)}, y^{(i)})
+$$ {#eq:app_loss}
 
 Công thức tối ưu hóa [@eq:app_loss] được sử dụng trong quá trình huấn luyện mô hình.

@@ -8,7 +8,9 @@ Hệ thống được đóng gói bằng công nghệ container hóa (Docker) gi
 
 ## Đánh giá hiệu năng và an toàn
 
-$$ E = \sum_{i=1}^{m} w_i \cdot x_i $$ {#eq:weight_sum}
+$$
+E = \sum_{i=1}^{m} w_i \cdot x_i
+$$ {#eq:weight_sum}
 
 Công thức [@eq:weight_sum] được áp dụng để tính điểm đánh giá an toàn tài nguyên.
 

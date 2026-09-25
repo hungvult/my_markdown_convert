@@ -188,7 +188,9 @@ Hệ thống được kiểm thử trên môi trường Linux Server với cấu
 
 Hệ thống áp dụng thuật toán mã hóa mật khẩu và tính toán độ phức tạp theo công thức:
 
-$$ H(s) = -\sum_{i=1}^{n} p_i \log_2(p_i) $$ {#eq:entropy}
+$$
+H(s) = -\sum_{i=1}^{n} p_i \log_2(p_i)
+$$ {#eq:entropy}
 
 Công thức tính toán [@eq:entropy] cho phép định lượng mức độ ngẫu nhiên của chuỗi bảo mật được cấp phát cho người dùng.
 
@@ -235,6 +237,8 @@ Mô hình triển khai chi tiết được thể hiện trong [@fig:app_module].
 
 Hàm mục tiêu được biểu diễn theo công thức:
 
-$$ J(w, b) = \frac{1}{m} \sum_{i=1}^m L(\hat{y}^{(i)}, y^{(i)}) $$ {#eq:loss}
+$$
+J(w, b) = \frac{1}{m} \sum_{i=1}^m L(\hat{y}^{(i)}, y^{(i)})
+$$ {#eq:loss}
 
 Công thức tối ưu hóa [@eq:loss] được sử dụng trong quá trình huấn luyện mô hình.

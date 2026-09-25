@@ -97,7 +97,7 @@ class MarkdownDocParser:
             return f"\n\n<!--MATH_BLOCK: {eq_content} | {eq_id}-->\n\n"
 
         clean_text = re.sub(
-            r'\$\$\s*\n?(.*?)\n?\s*\$\$(?:[ \t]*\{#(eq:[\w-]+)\})?',
+            r'\$\$\s*\n?(.*?)\n?\s*\$\$(?:[ \t]*\n?[ \t]*\{#(eq:[\w-]+)\})?',
             math_block_repl,
             clean_text,
             flags=re.DOTALL
