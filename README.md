@@ -24,9 +24,8 @@ my_markdown_convert/
 │       └── logo.jpg              # Logo trường chuẩn
 │
 ├── templates/                    # Hai dạng giải pháp độc lập (Self-contained)
-│   ├── single_file/              # Giải pháp 1: File đơn lẻ
-│   │   ├── content.md            # Toàn bộ nội dung đồ án trong 1 file duy nhất
-│   │   ├── thesis.yaml           # Metadata (Trường, Khoa, Đề tài, SV, GVHD)
+│   ├── single_file/              # Giải pháp 1: File đơn lẻ (Tất cả trong 1 file)
+│   │   ├── content.md            # Toàn bộ nội dung và Metadata (YAML Frontmatter) trong 1 file
 │   │   ├── references.bib        # Cơ sở dữ liệu tài liệu tham khảo BibTeX
 │   │   └── assets/               # Hình ảnh, sơ đồ cục bộ
 │   │       └── logo.jpg
