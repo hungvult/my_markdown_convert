@@ -25,7 +25,7 @@ build_target() {
     local config_path="${3:-}"
 
     echo "=========================================================="
-    echo "    BIÊN DỊCH BÁO CÁO ĐỒ ÁN TỐT NGHIỆP TỰ ĐỘNG"
+    echo "             BIÊN DỊCH BÁO CÁO TỰ ĐỘNG"
     echo "=========================================================="
     echo "Input  : $input_path"
     echo "Output : $output_path"
