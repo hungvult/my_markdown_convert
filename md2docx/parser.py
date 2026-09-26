@@ -90,14 +90,23 @@ class MarkdownDocParser:
             flags=re.MULTILINE
         )
         
-        # 3. Chuẩn hóa khối công thức toán $$ ... $$ {#eq:id}
+        # 3. Chuẩn hóa khối công thức toán $$ ... $$ {#eq:id} hoặc $$ ... \tag{eq:id} $$
         def math_block_repl(m):
             eq_content = m.group(1).strip()
             eq_id = m.group(2) if m.group(2) else ""
+
+            # Hỗ trợ cú pháp chuẩn LaTeX/KaTeX: \tag{eq:id} bên trong khối toán
+            m_tag = re.search(r'\\tag\{([^}]+)\}', eq_content)
+            if m_tag:
+                raw_tag = m_tag.group(1).strip()
+                if not eq_id:
+                    eq_id = raw_tag if raw_tag.startswith("eq:") else f"eq:{raw_tag}"
+                eq_content = re.sub(r'\\tag\{[^}]+\}', '', eq_content).strip()
+
             return f"\n\n<!--MATH_BLOCK: {eq_content} | {eq_id}-->\n\n"
 
         clean_text = re.sub(
-            r'\$\$\s*\n?(.*?)\n?\s*\$\$(?:[ \t]*\n?[ \t]*\{#(eq:[\w-]+)\})?',
+            r'\$\$\s*\n?(.*?)\n?\s*\$\$(?:\s*\{#(eq:[\w-]+)\})?',
             math_block_repl,
             clean_text,
             flags=re.DOTALL
